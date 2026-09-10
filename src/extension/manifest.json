@@ -1,0 +1,68 @@
+{
+  "manifest_version": 3,
+  "name": "MDViewer - Visualizador Markdown Moderno",
+  "version": "1.0.0",
+  "description": "Visualizador e leitor moderno de arquivos Markdown com suporte a GFM, Mermaid, KaTeX LaTeX, 7 temas visuais e exportação.",
+  "icons": {
+    "16": "assets/icon16.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "48": "assets/icon48.png",
+      "128": "assets/icon128.png"
+    },
+    "default_title": "MDViewer"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "contextMenus"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "file:///*/*.md",
+        "file:///*/*.markdown",
+        "file:///*/*.mdown",
+        "https://raw.githubusercontent.com/*/*.md",
+        "https://raw.githubusercontent.com/*/*.markdown",
+        "https://gitlab.com/*/-/raw/*/*.md",
+        "https://gist.githubusercontent.com/*/*.md",
+        "https://*/*.md",
+        "http://*/*.md"
+      ],
+      "js": [
+        "lib/engine.bundle.js",
+        "lib/mermaid.min.js",
+        "content/content.js"
+      ],
+      "css": [
+        "lib/katex.min.css",
+        "css/themes.css",
+        "css/markdown.css",
+        "content/content.css"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "viewer/viewer.html",
+        "assets/*",
+        "lib/*",
+        "lib/fonts/*",
+        "css/*"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

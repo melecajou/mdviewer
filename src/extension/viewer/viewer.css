@@ -1,0 +1,194 @@
+/* MDViewer Workspace Extension Specific Styles */
+
+/* Ensure body takes full viewport in extension tab */
+html, body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Visibility utilities */
+.hidden {
+  display: none !important;
+}
+
+.viewport-container.has-tabs .welcome-screen,
+.welcome-screen.hidden {
+  display: none !important;
+}
+
+/* Enhancements for Web Extension environment */
+.app-brand {
+  cursor: pointer;
+}
+
+/* File tree & hierarchical tree styles */
+.file-tree {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  transition: background-color 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.tree-item:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.tree-item.active {
+  background-color: var(--accent-bg, rgba(88, 166, 255, 0.15));
+  color: var(--accent-color, #58a6ff);
+  font-weight: 600;
+}
+
+.tree-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.tree-arrow.empty {
+  visibility: hidden;
+}
+
+.tree-arrow-spacer {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.tree-folder.expanded > .tree-arrow {
+  transform: rotate(90deg);
+}
+
+.tree-item-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.tree-folder-children {
+  list-style: none;
+  padding-left: 12px;
+  border-left: 1px dashed var(--border-subtle, rgba(240, 246, 252, 0.15));
+  margin-left: 8px;
+}
+
+.tree-folder-children.collapsed {
+  display: none;
+}
+
+.tree-item .folder-icon {
+  flex-shrink: 0;
+  color: #58a6ff;
+}
+
+.tree-item .file-icon {
+  flex-shrink: 0;
+  color: #3fb950;
+}
+
+.file-tree-item {
+  padding: 6px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  transition: background-color 0.15s ease;
+}
+
+.file-tree-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.file-tree-item.active {
+  background-color: var(--bg-active, rgba(88, 166, 255, 0.15));
+  color: var(--accent-color, #58a6ff);
+  font-weight: 500;
+}
+
+.file-tree-item .file-icon {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+/* Open Files list in Sidebar */
+.sidebar-section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  padding: 10px 12px 4px 12px;
+}
+
+.sidebar-folder-prompt {
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border-color);
+  border-radius: 6px;
+  padding: 14px 12px;
+  margin: 12px;
+  text-align: center;
+}
+
+.sidebar-folder-prompt p {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.sidebar-folder-prompt button {
+  width: 100%;
+  font-size: 0.8rem;
+  padding: 6px 10px;
+}
+
+/* Print override for chrome tab */
+@media print {
+  .app-toolbar,
+  .app-sidebar,
+  .tabs-bar,
+  .app-statusbar,
+  .find-bar,
+  .source-pane {
+    display: none !important;
+  }
+  .app-main,
+  .app-content,
+  .viewport-container,
+  .preview-pane {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .markdown-body {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+}

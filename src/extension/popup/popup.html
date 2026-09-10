@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MDViewer</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <header class="popup-header">
+      <div class="popup-brand">
+        <img src="../assets/icon.svg" alt="MDViewer" class="popup-logo">
+        <div>
+          <h1 class="popup-title">MDViewer</h1>
+          <span class="popup-version">v1.0.0 • Extensão Chrome</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="popup-actions">
+      <button id="btn-open-workspace" class="btn-primary">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+          <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25ZM1.5 6v8.25c0 .138.112.25.25.25H5V6ZM6.5 6v8.5h7.75a.25.25 0 0 0 .25-.25V6ZM14.5 4.5V1.75a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25V4.5Z"/>
+        </svg>
+        <span>Abrir Workspace Completo</span>
+      </button>
+
+      <button id="btn-open-file" class="btn-secondary">
+        <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor">
+          <path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586a1.75 1.75 0 0 1 1.237.513l2.914 2.914c.328.328.513.774.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.06v2.69c0 .138.112.25.25.25h2.69Z"/>
+        </svg>
+        <span>Abrir Arquivo Markdown (.md)</span>
+      </button>
+      <input type="file" id="file-input-picker" accept=".md,.markdown,.mdown,.txt" style="display: none;">
+    </div>
+
+    <div class="popup-section">
+      <label class="section-label" for="theme-select">Tema Visual Padrão:</label>
+      <select id="theme-select" class="popup-select">
+        <option value="github-dark">GitHub Dark (Escuro)</option>
+        <option value="github-light">GitHub Light (Claro)</option>
+        <option value="dracula">Dracula</option>
+        <option value="nord">Nord</option>
+        <option value="one-dark">One Dark</option>
+        <option value="sepia">Sépia / Leitura</option>
+        <option value="monokai">Monokai</option>
+      </select>
+    </div>
+
+    <div class="file-url-tip" id="file-url-tip">
+      <div class="tip-header">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+          <path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/>
+        </svg>
+        <strong>Dica para arquivos locais (file://)</strong>
+      </div>
+      <p>Para abrir links locais diretamente no Chrome, ative a opção <em>"Permitir acesso aos URLs do arquivo"</em> na página de extensões.</p>
+      <button id="btn-open-extensions-page" class="btn-text">Como configurar →</button>
+    </div>
+
+    <footer class="popup-footer">
+      <span>MDViewer • GFM • LaTeX • Mermaid</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

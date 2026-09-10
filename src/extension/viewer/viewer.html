@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="github-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MDViewer Workspace</title>
+  
+  <!-- KaTeX CSS -->
+  <link rel="stylesheet" href="../lib/katex.min.css">
+  
+  <!-- App Styles -->
+  <link rel="stylesheet" href="../css/themes.css">
+  <link rel="stylesheet" href="../css/markdown.css">
+  <link rel="stylesheet" href="../css/app.css">
+  <link rel="stylesheet" href="viewer.css">
+</head>
+<body>
+
+  <!-- Hidden File Pickers -->
+  <input type="file" id="hidden-file-input" accept=".md,.markdown,.mdown,.txt" multiple style="display: none;">
+  <input type="file" id="hidden-folder-input" webkitdirectory directory multiple style="display: none;">
+
+  <!-- Top Toolbar -->
+  <header class="app-toolbar">
+    <div class="toolbar-section">
+      <!-- Toggle Sidebar -->
+      <button id="btn-toggle-sidebar" class="toolbar-btn icon-only" title="Alternar Barra Lateral (Ctrl+B)">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+          <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25ZM1.5 6v8.25c0 .138.112.25.25.25H5V6ZM6.5 6v8.5h7.75a.25.25 0 0 0 .25-.25V6ZM14.5 4.5V1.75a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25V4.5Z"/>
+        </svg>
+      </button>
+
+      <div class="app-brand">
+        <img src="../assets/icon.svg" alt="MDViewer" class="brand-icon">
+        <span>MDViewer</span>
+      </div>
+
+      <div class="toolbar-divider"></div>
+
+      <!-- Open File -->
+      <button id="btn-open-file" class="toolbar-btn" title="Abrir Arquivo Markdown (Ctrl+O)">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+          <path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586a1.75 1.75 0 0 1 1.237.513l2.914 2.914c.328.328.513.774.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.06v2.69c0 .138.112.25.25.25h2.69Z"/>
+        </svg>
+        <span>Abrir</span>
+      </button>
+
+      <!-- Open Folder -->
+      <button id="btn-open-folder" class="toolbar-btn" title="Abrir Pasta Local">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+          <path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75ZM1.5 2.75a.25.25 0 0 1 .25-.25H5c.18 0 .36.09.47.23l1.15 1.53A1.75 1.75 0 0 0 8.02 5h6.23a.25.25 0 0 1 .25.25v8a.25.25 0 0 1-.25.25H1.75a.25.25 0 0 1-.25-.25Z"/>
+        </svg>
+        <span>Pasta</span>
+      </button>
+
+      <!-- Reload File -->
+      <button id="btn-reload" class="toolbar-btn icon-only" title="Recarregar (Ctrl+R)">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+          <path d="M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7 7 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7 7 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Center Section: View Mode & Search -->
+    <div class="toolbar-section">
+      <div class="view-mode-group">
+        <button id="btn-view-preview" class="view-mode-btn active" title="Pré-visualização Renderizada (Alt+1)">
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor">
+            <path d="M8 2c1.981 0 3.671.992 4.933 2.078 1.27 1.091 2.187 2.345 2.637 3.023a1.62 1.62 0 0 1 0 1.798c-.45.678-1.367 1.932-2.637 3.023C11.67 13.008 9.981 14 8 14c-1.981 0-3.671-.992-4.933-2.078C1.797 10.83.88 9.577.43 8.899a1.62 1.62 0 0 1 0-1.798c.45-.678 1.367-1.932 2.637-3.023C4.33 2.992 6.019 2 8 2ZM1.679 7.932a.12.12 0 0 0 0 .136c.411.62 1.259 1.774 2.433 2.782C5.303 11.871 6.78 12.5 8 12.5c1.22 0 2.697-.629 3.888-1.65 1.174-1.008 2.022-2.162 2.433-2.782a.12.12 0 0 0 0-.136c-.411-.62-1.259-1.774-2.433-2.782C10.697 4.129 9.22 3.5 8 3.5c-1.22 0-2.697.629-3.888 1.65-1.174 1.008-2.022 2.162-2.433 2.782ZM8 5.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/>
+          </svg>
+          <span>Visualizar</span>
+        </button>
+        <button id="btn-view-split" class="view-mode-btn" title="Visualização Dividida (Alt+2)">
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor">
+            <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25ZM7.25 1.5H1.75a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h5.5Zm1.5 0v13h5.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25Z"/>
+          </svg>
+          <span>Dividido</span>
+        </button>
+        <button id="btn-view-source" class="view-mode-btn" title="Código Fonte Markdown (Alt+3)">
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor">
+            <path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.06 1.06L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06l4.25-4.25Z"/>
+          </svg>
+          <span>Fonte</span>
+        </button>
+      </div>
+
+      <button id="btn-find" class="toolbar-btn icon-only" title="Localizar no documento (Ctrl+F)">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+          <path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.5 4.5 0 1 0-9 0 4.5 4.5 0 0 0 9 0Z"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Right Section: Live Watch, Themes, Zoom, Export -->
+    <div class="toolbar-section">
+      <div id="watch-status" class="watch-indicator active" title="Auto-Sync ativo">
+        <span class="watch-dot"></span>
+        <span>Auto-Sync</span>
+      </div>
+
+      <div class="toolbar-divider"></div>
+
+      <!-- Zoom Controls -->
+      <button id="btn-zoom-out" class="toolbar-btn icon-only" title="Diminuir Zoom (Ctrl+- )">
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor">
+          <path d="M2 7.75A.75.75 0 0 1 2.75 7h10.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 7.75Z"/>
+        </svg>
+      </button>
+      <button id="btn-zoom-reset" class="toolbar-btn" style="padding: 0 4px; font-size: 0.75rem;" title="Restaurar Zoom (Ctrl+0)">
+        <span id="zoom-level-text">100%</span>
+      </button>
+      <button id="btn-zoom-in" class="toolbar-btn icon-only" title="Aumentar Zoom (Ctrl++)">
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor">
+          <path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/>
+        </svg>
+      </button>
+
+      <div class="toolbar-divider"></div>
+
+      <!-- Theme Selector -->
+      <select id="theme-selector" class="theme-select" title="Alterar Tema Visual">
+        <option value="github-dark">GitHub Dark</option>
+        <option value="github-light">GitHub Light</option>
+        <option value="dracula">Dracula</option>
+        <option value="nord">Nord</option>
+        <option value="one-dark">One Dark</option>
+        <option value="sepia">Sépia / Leitura</option>
+        <option value="monokai">Monokai</option>
+      </select>
+
+      <!-- Export Dropdown -->
+      <div class="dropdown" id="export-dropdown">
+        <button id="btn-export-toggle" class="toolbar-btn" title="Exportar Documento">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+            <path d="M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.5.75a.75.75 0 0 1 .75-.75h4.25c.414 0 .75.336.75.75v4.25a.75.75 0 0 1-1.5 0V3.56L9.53 8.53a.75.75 0 0 1-1.06-1.06L13.44 2.5H11a.75.75 0 0 1-.75-.75Z"/>
+          </svg>
+          <span>Exportar</span>
+        </button>
+        <div class="dropdown-menu">
+          <div class="dropdown-item" id="menu-export-pdf">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M1.75 2.5h10.5a.25.25 0 0 1 .25.25v10.5a.25.25 0 0 1-.25.25H1.75a.25.25 0 0 1-.25-.25V2.75a.25.25 0 0 1 .25-.25ZM3.5 5.5v5h1.5v-1.5h1a1.5 1.5 0 0 0 0-3H3.5Zm1.5 1.25h1a.25.25 0 0 1 0 .5H5v-.5Z"/></svg>
+            <span>Imprimir / PDF (Ctrl+P)</span>
+          </div>
+          <div class="dropdown-item" id="menu-export-html">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M2 2.75C2 1.784 2.784 1 3.75 1h8.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 12.25 15h-8.5A1.75 1.75 0 0 1 2 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25Z"/></svg>
+            <span>Exportar como HTML</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Application Workspace -->
+  <div class="app-main">
+    
+    <!-- Collapsible Sidebar -->
+    <aside class="app-sidebar" id="app-sidebar">
+      <div class="sidebar-tabs">
+        <button class="sidebar-tab-btn active" data-tab="explorer" title="Explorador de Arquivos">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z"/></svg>
+          <span>Arquivos</span>
+        </button>
+        <button class="sidebar-tab-btn" data-tab="toc" title="Sumário / Índice do Documento">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M2 3.75C2 3.336 2.336 3 2.75 3h10.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 3.75Zm0 4C2 7.336 2.336 7 2.75 7h10.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 7.75Zm0 4c0-.414.336-.75.75-.75h10.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z"/></svg>
+          <span>Índice</span>
+        </button>
+        <button class="sidebar-tab-btn" data-tab="recent" title="Histórico de Arquivos Recentes">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm7-3.25v3.5h2.75a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75v-4.25a.75.75 0 0 1 1.5 0Z"/></svg>
+          <span>Recentes</span>
+        </button>
+      </div>
+
+      <!-- Pane 1: File Explorer -->
+      <div class="sidebar-pane active" id="pane-explorer">
+        <div class="explorer-header">
+          <span class="explorer-title" id="explorer-folder-name">Nenhuma Pasta Aberta</span>
+          <button id="btn-sidebar-open-folder" class="toolbar-btn icon-only" title="Abrir Pasta Local">
+            <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z"/></svg>
+          </button>
+        </div>
+        <input type="text" id="explorer-search" class="explorer-search-input" placeholder="Filtrar arquivos...">
+        <div id="file-tree-container">
+          <p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-top: 20px;">
+            Abra uma pasta para navegar nos arquivos Markdown.
+          </p>
+        </div>
+      </div>
+
+      <!-- Pane 2: Table of Contents (TOC) -->
+      <div class="sidebar-pane" id="pane-toc">
+        <div class="explorer-header">
+          <span class="explorer-title">Sumário do Documento</span>
+        </div>
+        <div id="toc-container">
+          <p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-top: 20px;">
+            Nenhum cabeçalho encontrado no arquivo atual.
+          </p>
+        </div>
+      </div>
+
+      <!-- Pane 3: Recent Files -->
+      <div class="sidebar-pane" id="pane-recent">
+        <div class="explorer-header">
+          <span class="explorer-title">Arquivos Recentes</span>
+        </div>
+        <ul class="recent-list" id="recent-files-list"></ul>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="app-content mode-preview" id="app-content-wrapper">
+      <!-- Tabs Bar -->
+      <div class="tabs-bar" id="tabs-bar">
+        <button class="tab-add-btn" id="btn-tab-add" title="Abrir Arquivo (Ctrl+O)">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/></svg>
+        </button>
+      </div>
+
+      <!-- Viewport -->
+      <div class="viewport-container" id="viewport-container">
+        
+        <!-- Welcome Screen (Visible when 0 tabs open) -->
+        <div class="welcome-screen" id="welcome-screen">
+          <img src="../assets/icon.svg" alt="MDViewer" class="welcome-logo">
+          <h1 class="welcome-title">MDViewer Workspace</h1>
+          <p class="welcome-subtitle">Visualizador moderno de Markdown para Chrome com GFM, KaTeX, Mermaid e temas visuais.</p>
+          
+          <div class="welcome-dropzone" id="welcome-dropzone">
+            <svg viewBox="0 0 16 16" width="40" height="40" fill="currentColor" style="color: var(--accent-color); margin-bottom: 12px;">
+              <path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586a1.75 1.75 0 0 1 1.237.513l2.914 2.914c.328.328.513.774.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.06v2.69c0 .138.112.25.25.25h2.69Z"/>
+            </svg>
+            <p style="font-weight: 600; font-size: 1rem; color: var(--text-primary);">Arraste e solte arquivos Markdown aqui</p>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">ou selecione uma opção abaixo</p>
+            
+            <div class="welcome-actions">
+              <button class="btn-primary" id="btn-welcome-open-file">
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586a1.75 1.75 0 0 1 1.237.513l2.914 2.914c.328.328.513.774.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.06v2.69c0 .138.112.25.25.25h2.69Z"/></svg>
+                <span>Abrir Arquivo</span>
+              </button>
+              <button class="btn-secondary" id="btn-welcome-sample">
+                <span>Ver Exemplo Completo</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Source View Pane -->
+        <div class="source-pane" id="source-pane">
+          <textarea class="source-textarea" id="source-textarea" spellcheck="false" placeholder="Código fonte markdown..."></textarea>
+        </div>
+
+        <!-- Rendered Preview Pane -->
+        <div class="preview-pane" id="preview-pane">
+          <div class="markdown-body" id="markdown-container"></div>
+        </div>
+
+        <!-- Find Bar -->
+        <div class="find-bar" id="find-bar">
+          <input type="text" class="find-input" id="find-input" placeholder="Buscar texto...">
+          <span class="find-count" id="find-count">0 / 0</span>
+          <button class="find-btn" id="find-prev" title="Anterior (Shift+Enter)">▲</button>
+          <button class="find-btn" id="find-next" title="Próximo (Enter)">▼</button>
+          <button class="find-btn" id="find-close" title="Fechar (Esc)">✕</button>
+        </div>
+
+      </div>
+
+      <!-- Status Bar -->
+      <footer class="app-statusbar">
+        <div class="statusbar-item">
+          <span id="status-filepath">Nenhum arquivo</span>
+        </div>
+        <div class="statusbar-item" style="gap: 16px;">
+          <span id="status-stats">0 palavras • 0 linhas</span>
+          <span id="status-read-time">1 min de leitura</span>
+          <span>UTF-8</span>
+        </div>
+      </footer>
+    </main>
+
+  </div>
+
+  <!-- Keyboard Shortcuts Modal -->
+  <div class="modal-overlay" id="shortcuts-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">Atalhos de Teclado</h2>
+        <button class="modal-close-btn" id="btn-close-shortcuts">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="shortcut-grid">
+          <div class="shortcut-row">
+            <span class="shortcut-label">Abrir Arquivo</span>
+            <span class="kbd-badge">Ctrl + O</span>
+          </div>
+          <div class="shortcut-row">
+            <span class="shortcut-label">Fechar Aba</span>
+            <span class="kbd-badge">Ctrl + W</span>
+          </div>
+          <div class="shortcut-row">
+            <span class="shortcut-label">Recarregar</span>
+            <span class="kbd-badge">Ctrl + R</span>
+          </div>
+          <div class="shortcut-row">
+            <span class="shortcut-label">Localizar / Buscar</span>
+            <span class="kbd-badge">Ctrl + F</span>
+          </div>
+          <div class="shortcut-row">
+            <span class="shortcut-label">Exportar / Imprimir PDF</span>
+            <span class="kbd-badge">Ctrl + P</span>
+          </div>
+          <div class="shortcut-row">
+            <span class="shortcut-label">Alternar Barra Lateral</span>
+            <span class="kbd-badge">Ctrl + B</span>
+          </div>
+          <div class="shortcut-row">
+            <span class="shortcut-label">Alternar Índice (TOC)</span>
+            <span class="kbd-badge">Ctrl + Shift + T</span>
+          </div>
+          <div class="shortcut-row">
+            <span class="shortcut-label">Modo Visualização</span>
+            <span class="kbd-badge">Alt + 1</span>
+          </div>
+          <div class="shortcut-row">
+            <span class="shortcut-label">Modo Dividido (Split)</span>
+            <span class="kbd-badge">Alt + 2</span>
+          </div>
+          <div class="shortcut-row">
+            <span class="shortcut-label">Modo Código Fonte</span>
+            <span class="kbd-badge">Alt + 3</span>
+          </div>
+          <div class="shortcut-row">
+            <span class="shortcut-label">Zoom In / Out / Reset</span>
+            <span class="kbd-badge">Ctrl + / - / 0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Image Lightbox Modal -->
+  <div class="lightbox-modal" id="lightbox-modal">
+    <button class="lightbox-close-btn" id="lightbox-close">✕ Fechar</button>
+    <img src="" alt="Ampliação" class="lightbox-img" id="lightbox-img">
+  </div>
+
+  <!-- Libraries -->
+  <script src="../lib/engine.bundle.js"></script>
+  <script src="../lib/mermaid.min.js"></script>
+
+  <!-- App Frontend Script -->
+  <script src="viewer.js"></script>
+</body>
+</html>

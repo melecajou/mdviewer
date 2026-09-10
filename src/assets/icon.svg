@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1e2e"/>
+      <stop offset="50%" stop-color="#181825"/>
+      <stop offset="100%" stop-color="#11111b"/>
+    </linearGradient>
+    
+    <linearGradient id="accent-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#89b4fa"/>
+      <stop offset="50%" stop-color="#b4befe"/>
+      <stop offset="100%" stop-color="#cba6f7"/>
+    </linearGradient>
+
+    <linearGradient id="border-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#585b70"/>
+      <stop offset="100%" stop-color="#313244"/>
+    </linearGradient>
+
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#89b4fa" flood-opacity="0.3"/>
+    </filter>
+    
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="20" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- Background Squircle with Shadow -->
+  <rect x="32" y="32" width="448" height="448" rx="100" fill="url(#bg-grad)" stroke="url(#border-grad)" stroke-width="6" filter="url(#shadow)"/>
+
+  <!-- Subtle grid lines background -->
+  <path d="M96 160 H416 M96 256 H416 M96 352 H416" stroke="#313244" stroke-width="2" stroke-dasharray="8 8" opacity="0.4"/>
+  <path d="M160 96 V416 M256 96 V416 M352 96 V416" stroke="#313244" stroke-width="2" stroke-dasharray="8 8" opacity="0.4"/>
+
+  <!-- Markdown Symbol -->
+  <!-- 'M' shape -->
+  <path d="M100 340 V172 C100 165 106 160 113 160 H138 C144 160 150 164 153 170 L212 268 L271 170 C274 164 280 160 286 160 H311 C318 160 324 165 324 172 V340 C324 347 318 352 311 352 H281 C274 352 268 347 268 340 V236 L226 306 C223 311 217 314 212 314 C207 314 201 311 198 306 L156 236 V340 C156 347 150 352 143 352 H113 C106 352 100 347 100 340 Z"
+        fill="url(#accent-grad)" filter="url(#glow)"/>
+
+  <!-- Down Arrow shape -->
+  <path d="M372 160 H404 C411 160 416 165 416 172 V264 H444 C453 264 458 274 452 281 L396 347 C392 352 384 352 380 347 L324 281 C318 274 323 264 332 264 H360 V172 C360 165 365 160 372 160 Z"
+        fill="#f38ba8" filter="url(#glow)"/>
+</svg>

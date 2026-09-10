@@ -1,0 +1,94 @@
+{
+  "name": "mdviewer",
+  "version": "1.0.0",
+  "description": "Visualizador e Leitor Moderno de Arquivos Markdown para Desktop (Linux, Windows) e Extensão Chrome",
+  "main": "src/main/main.js",
+  "bin": {
+    "mdviewer": "./bin/mdviewer"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "build:extension": "node build-extension.js",
+    "dev:extension": "node build-extension.js",
+    "pack:win": "electron-builder --win --dir",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux"
+  },
+  "keywords": [
+    "markdown",
+    "viewer",
+    "reader",
+    "electron",
+    "desktop",
+    "windows",
+    "linux",
+    "mermaid",
+    "katex",
+    "gfm"
+  ],
+  "author": "Eduardo H.",
+  "license": "MIT",
+  "dependencies": {
+    "chokidar": "^3.6.0",
+    "highlight.js": "^11.9.0",
+    "katex": "^0.16.10",
+    "marked": "^12.0.2",
+    "mermaid": "^10.9.0"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.mdviewer.app",
+    "productName": "MDViewer",
+    "directories": {
+      "output": "dist/desktop"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "src/assets/icon.ico",
+      "fileAssociations": [
+        {
+          "ext": "md",
+          "name": "Markdown Document",
+          "description": "Arquivo Markdown",
+          "role": "Viewer",
+          "icon": "src/assets/icon.ico"
+        },
+        {
+          "ext": "markdown",
+          "name": "Markdown Document",
+          "description": "Arquivo Markdown",
+          "role": "Viewer",
+          "icon": "src/assets/icon.ico"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MDViewer"
+    }
+  }
+}

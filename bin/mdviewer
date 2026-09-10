@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+# MDViewer Launcher Script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+ELECTRON_BIN="$SCRIPT_DIR/node_modules/electron/dist/electron"
+
+# Run Electron directly if binary is present (fastest & bypasses npx overhead)
+if [ -x "$ELECTRON_BIN" ]; then
+    exec "$ELECTRON_BIN" "$SCRIPT_DIR" "$@"
+fi
+
+# Check if node & npm are available as fallback
+if ! command -v node &> /dev/null; then
+    echo "Erro: Node.js não foi encontrado no PATH."
+    exit 1
+fi
+
+# Fallback to npx
+exec npx --prefix "$SCRIPT_DIR" electron "$SCRIPT_DIR" "$@"

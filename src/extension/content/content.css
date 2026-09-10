@@ -1,0 +1,178 @@
+/* MDViewer Chrome Extension - Content Script Styles */
+
+body.mdviewer-injected-body {
+  margin: 0 !important;
+  padding: 0 !important;
+  background-color: var(--bg-primary, #0d1117) !important;
+  color: var(--text-primary, #c9d1d9) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif !important;
+  overflow-y: auto !important;
+}
+
+.mdviewer-content-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--bg-primary, #0d1117);
+}
+
+/* Floating Toolbar */
+.mdviewer-floating-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background-color: var(--bg-secondary, #161b22);
+  border-bottom: 1px solid var(--border-color, #30363d);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.mdviewer-toolbar-left,
+.mdviewer-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mdviewer-doc-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #c9d1d9);
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mdviewer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--bg-tertiary, #21262d);
+  color: var(--accent-color, #58a6ff);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.mdviewer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background-color: var(--bg-tertiary, #21262d);
+  border: 1px solid var(--border-color, #30363d);
+  color: var(--text-primary, #c9d1d9);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mdviewer-btn:hover {
+  background-color: var(--border-color, #30363d);
+  color: var(--text-bright, #f0f6fc);
+}
+
+.mdviewer-select {
+  background-color: var(--bg-tertiary, #21262d);
+  border: 1px solid var(--border-color, #30363d);
+  color: var(--text-primary, #c9d1d9);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+
+/* Document Container */
+.mdviewer-document-layout {
+  display: flex;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 32px 24px;
+  box-sizing: border-box;
+  gap: 24px;
+}
+
+.mdviewer-main-article {
+  flex: 1;
+  min-width: 0;
+}
+
+/* TOC Drawer / Floating Outline */
+.mdviewer-toc-sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 70px;
+  max-height: calc(100vh - 90px);
+  overflow-y: auto;
+  padding-left: 16px;
+  border-left: 1px solid var(--border-color, #30363d);
+  display: none;
+}
+
+.mdviewer-toc-sidebar.visible {
+  display: block;
+}
+
+.mdviewer-toc-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted, #8b949e);
+  margin-bottom: 12px;
+  letter-spacing: 0.5px;
+}
+
+.mdviewer-toc-link {
+  display: block;
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--text-muted, #8b949e);
+  text-decoration: none;
+  transition: color 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mdviewer-toc-link:hover {
+  color: var(--accent-color, #58a6ff);
+}
+
+.mdviewer-toc-link.level-1 { font-weight: 600; color: var(--text-primary, #c9d1d9); }
+.mdviewer-toc-link.level-2 { padding-left: 10px; }
+.mdviewer-toc-link.level-3 { padding-left: 20px; }
+.mdviewer-toc-link.level-4 { padding-left: 30px; }
+
+/* Raw Pre View */
+.mdviewer-raw-view {
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--bg-secondary, #161b22);
+  padding: 24px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #30363d);
+  display: none;
+}
+
+@media print {
+  .mdviewer-floating-toolbar,
+  .mdviewer-toc-sidebar {
+    display: none !important;
+  }
+  .mdviewer-document-layout {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+}

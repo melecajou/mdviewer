@@ -1,0 +1,552 @@
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
+const path = require('path');
+const fs = require('fs');
+const Store = require('./store');
+const FileWatcherManager = require('./file-watcher');
+
+let mainWindow = null;
+const store = new Store();
+let watcherManager = null;
+
+// Parse file/folder paths from command line arguments
+function parseCommandLineArgs(argv, cwd = process.cwd()) {
+  const targets = [];
+  if (!Array.isArray(argv)) return targets;
+
+  const appPath = path.resolve(__dirname, '../..');
+  const mainScriptPath = path.resolve(__dirname, 'main.js');
+
+  for (let i = 0; i < argv.length; i++) {
+    let arg = argv[i];
+    if (!arg || typeof arg !== 'string') continue;
+
+    // Skip flags (e.g. --ozone-platform, -r, etc.)
+    if (arg.startsWith('-')) continue;
+
+    // Skip electron or mdviewer binaries (Linux & Windows)
+    if (
+      arg.endsWith('/electron') ||
+      arg.endsWith('\\electron.exe') ||
+      arg.endsWith('/electron.exe') ||
+      arg.endsWith('\\mdviewer.exe') ||
+      arg.endsWith('/mdviewer.exe') ||
+      arg === 'electron' ||
+      arg === 'mdviewer'
+    ) {
+      continue;
+    }
+
+    // Handle file:// URIs (from file managers / freedesktop / Windows shell)
+    if (arg.startsWith('file://')) {
+      try {
+        const parsedUrl = new URL(arg);
+        arg = decodeURIComponent(parsedUrl.pathname);
+        if (process.platform === 'win32') {
+          arg = arg.replace(/^\/([a-zA-Z]:)/, '$1');
+        }
+      } catch (e) {
+        arg = arg.replace(/^file:\/\//, '');
+      }
+    }
+
+    try {
+      const resolved = path.isAbsolute(arg) ? path.resolve(arg) : path.resolve(cwd, arg);
+
+      // Skip the app directory and main script
+      if (resolved === appPath || resolved === mainScriptPath) {
+        continue;
+      }
+
+      // Check if target exists on disk
+      if (fs.existsSync(resolved)) {
+        targets.push(resolved);
+      }
+    } catch (e) {
+      console.error('Error checking arg path:', e);
+    }
+  }
+  return targets;
+}
+
+let pendingTargets = parseCommandLineArgs(process.argv);
+
+// Single instance lock
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    const targets = parseCommandLineArgs(commandLine, workingDirectory);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+
+      if (targets.length > 0) {
+        mainWindow.webContents.send('cli:open-targets', targets);
+      }
+    } else {
+      pendingTargets.push(...targets);
+    }
+  });
+
+  app.whenReady().then(() => {
+    createWindow();
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  });
+}
+
+function createWindow() {
+  const isWin = process.platform === 'win32';
+  const icoPath = path.join(__dirname, '../assets/icon.ico');
+  const pngPath = path.join(__dirname, '../assets/icon.png');
+  const iconPath = (isWin && fs.existsSync(icoPath)) ? icoPath : (fs.existsSync(pngPath) ? pngPath : undefined);
+
+  mainWindow = new BrowserWindow({
+    width: savedBounds.width || 1200,
+    height: savedBounds.height || 800,
+    x: savedBounds.x,
+    y: savedBounds.y,
+    minWidth: 750,
+    minHeight: 500,
+    title: 'MDViewer',
+    icon: iconPath,
+    backgroundColor: '#0d1117',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
+  });
+
+  // Init watcher
+  watcherManager = new FileWatcherManager((event, filePath) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('file:changed', { event, filePath });
+    }
+  });
+
+  // Save window bounds on resize/move
+  const saveBounds = () => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isMaximized() && !mainWindow.isMinimized()) {
+      store.set('windowBounds', mainWindow.getBounds());
+    }
+  };
+  mainWindow.on('resize', saveBounds);
+  mainWindow.on('move', saveBounds);
+
+  // Build native menu
+  createAppMenu();
+
+  // Load index.html
+  mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+
+  // When DOM is ready, send initial command-line targets if any
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (pendingTargets.length > 0) {
+      mainWindow.webContents.send('cli:open-targets', [...pendingTargets]);
+    }
+  });
+
+  mainWindow.on('closed', () => {
+    if (watcherManager) {
+      watcherManager.clear();
+    }
+    mainWindow = null;
+  });
+}
+
+function createAppMenu() {
+  const isMac = process.platform === 'darwin';
+
+  const template = [
+    {
+      label: 'Arquivo',
+      submenu: [
+        {
+          label: 'Abrir Arquivo...',
+          accelerator: 'CmdOrCtrl+O',
+          click: () => mainWindow && mainWindow.webContents.send('menu:open-file')
+        },
+        {
+          label: 'Abrir Pasta...',
+          accelerator: 'CmdOrCtrl+Shift+O',
+          click: () => mainWindow && mainWindow.webContents.send('menu:open-folder')
+        },
+        { type: 'separator' },
+        {
+          label: 'Fechar Aba',
+          accelerator: 'CmdOrCtrl+W',
+          click: () => mainWindow && mainWindow.webContents.send('menu:close-tab')
+        },
+        {
+          label: 'Recarregar Arquivo',
+          accelerator: 'CmdOrCtrl+R',
+          click: () => mainWindow && mainWindow.webContents.send('menu:reload-file')
+        },
+        { type: 'separator' },
+        {
+          label: 'Exportar para HTML...',
+          accelerator: 'CmdOrCtrl+Shift+E',
+          click: () => mainWindow && mainWindow.webContents.send('menu:export-html')
+        },
+        {
+          label: 'Imprimir / Exportar PDF...',
+          accelerator: 'CmdOrCtrl+P',
+          click: () => mainWindow && mainWindow.webContents.send('menu:export-pdf')
+        },
+        { type: 'separator' },
+        {
+          label: 'Sair',
+          accelerator: isMac ? 'Cmd+Q' : 'Ctrl+Q',
+          click: () => app.quit()
+        }
+      ]
+    },
+    {
+      label: 'Editar',
+      submenu: [
+        {
+          label: 'Localizar no Documento',
+          accelerator: 'CmdOrCtrl+F',
+          click: () => mainWindow && mainWindow.webContents.send('menu:find')
+        },
+        { type: 'separator' },
+        { role: 'copy', label: 'Copiar' },
+        { role: 'selectAll', label: 'Selecionar Tudo' }
+      ]
+    },
+    {
+      label: 'Visualizar',
+      submenu: [
+        {
+          label: 'Alternar Barra Lateral',
+          accelerator: 'CmdOrCtrl+B',
+          click: () => mainWindow && mainWindow.webContents.send('menu:toggle-sidebar')
+        },
+        {
+          label: 'Alternar Índice (TOC)',
+          accelerator: 'CmdOrCtrl+Shift+T',
+          click: () => mainWindow && mainWindow.webContents.send('menu:toggle-toc')
+        },
+        { type: 'separator' },
+        {
+          label: 'Modo Pré-visualização',
+          accelerator: 'Alt+1',
+          click: () => mainWindow && mainWindow.webContents.send('menu:set-view-mode', 'preview')
+        },
+        {
+          label: 'Modo Dividido (Split)',
+          accelerator: 'Alt+2',
+          click: () => mainWindow && mainWindow.webContents.send('menu:set-view-mode', 'split')
+        },
+        {
+          label: 'Modo Código Fonte',
+          accelerator: 'Alt+3',
+          click: () => mainWindow && mainWindow.webContents.send('menu:set-view-mode', 'source')
+        },
+        { type: 'separator' },
+        {
+          label: 'Aumentar Zoom',
+          accelerator: 'CmdOrCtrl+Plus',
+          click: () => mainWindow && mainWindow.webContents.send('menu:zoom-in')
+        },
+        {
+          label: 'Diminuir Zoom',
+          accelerator: 'CmdOrCtrl+-',
+          click: () => mainWindow && mainWindow.webContents.send('menu:zoom-out')
+        },
+        {
+          label: 'Restaurar Zoom',
+          accelerator: 'CmdOrCtrl+0',
+          click: () => mainWindow && mainWindow.webContents.send('menu:zoom-reset')
+        },
+        { type: 'separator' },
+        { role: 'togglefullscreen', label: 'Tela Cheia' },
+        { role: 'toggleDevTools', label: 'Ferramentas do Desenvolvedor' }
+      ]
+    },
+    {
+      label: 'Ajuda',
+      submenu: [
+        {
+          label: 'Abrir Documento de Exemplo',
+          click: () => mainWindow && mainWindow.webContents.send('menu:open-sample')
+        },
+        {
+          label: 'Atalhos de Teclado',
+          accelerator: 'F1',
+          click: () => mainWindow && mainWindow.webContents.send('menu:show-shortcuts')
+        },
+        { type: 'separator' },
+        {
+          label: 'Sobre o MDViewer',
+          click: () => {
+            dialog.showMessageBox(mainWindow, {
+              type: 'info',
+              title: 'Sobre o MDViewer',
+              message: 'MDViewer Desktop',
+              detail: `Versão 1.0.0\nLeitor e Visualizador de Markdown para Windows e Linux\n\nRecursos:\n• Suporte completo a GFM, Tabelas e Checklists\n• Realce de Sintaxe (Highlight.js)\n• Diagramas Mermaid interativos\n• Fórmulas Matemáticas LaTeX (KaTeX)\n• Callouts e Alertas GitHub\n• Live Reload com Chokidar\n• Exportação para PDF e HTML`
+            });
+          }
+        }
+      ]
+    }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
+// ---------------- IPC Handlers ----------------
+
+// Dialog: Open File
+ipcMain.handle('dialog:open-file', async (event, preferredPath) => {
+  const defaultPath = store.getLastDirectory(preferredPath);
+  const options = {
+    title: 'Abrir Arquivo Markdown',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Arquivos Markdown', extensions: ['md', 'markdown', 'mdown', 'mkd', 'mdx', 'txt'] },
+      { name: 'Todos os Arquivos', extensions: ['*'] }
+    ]
+  };
+  if (defaultPath) {
+    options.defaultPath = defaultPath;
+  }
+  const result = await dialog.showOpenDialog(mainWindow, options);
+  if (!result.canceled && result.filePaths.length > 0) {
+    const selected = result.filePaths[0];
+    store.setLastDirectory(path.dirname(selected));
+    return selected;
+  }
+  return null;
+});
+
+// Dialog: Open Folder
+ipcMain.handle('dialog:open-folder', async (event, preferredPath) => {
+  const defaultPath = store.getLastDirectory(preferredPath);
+  const options = {
+    title: 'Abrir Pasta no Explorador',
+    properties: ['openDirectory']
+  };
+  if (defaultPath) {
+    options.defaultPath = defaultPath;
+  }
+  const result = await dialog.showOpenDialog(mainWindow, options);
+  if (!result.canceled && result.filePaths.length > 0) {
+    const selected = result.filePaths[0];
+    store.setLastDirectory(selected);
+    store.set('lastOpenedFolder', selected);
+    return selected;
+  }
+  return null;
+});
+
+// File: Read Content
+ipcMain.handle('file:read', async (event, filePath) => {
+  try {
+    const resolvedPath = path.resolve(filePath);
+    const content = await fs.promises.readFile(resolvedPath, 'utf-8');
+    const stats = await fs.promises.stat(resolvedPath);
+    store.addRecentFile(resolvedPath);
+    store.setLastDirectory(path.dirname(resolvedPath));
+    return {
+      success: true,
+      filePath: resolvedPath,
+      fileName: path.basename(resolvedPath),
+      dirName: path.dirname(resolvedPath),
+      content,
+      size: stats.size,
+      mtime: stats.mtimeMs
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.message,
+      filePath
+    };
+  }
+});
+
+// File: Read Directory Tree
+ipcMain.handle('file:read-dir', async (event, dirPath) => {
+  try {
+    const resolvedDir = path.resolve(dirPath);
+    store.addRecentFolder(resolvedDir);
+    store.set('lastOpenedFolder', resolvedDir);
+    store.setLastDirectory(resolvedDir);
+
+    async function scanDirectory(dir, depth = 0) {
+      if (depth > 5) return []; // Limit recursion depth
+      const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+      const items = [];
+
+      for (const entry of entries) {
+        if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === '__pycache__' || entry.name === 'target' || entry.name === 'dist') {
+          continue;
+        }
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          const children = await scanDirectory(fullPath, depth + 1);
+          items.push({
+            name: entry.name,
+            path: fullPath,
+            isDirectory: true,
+            children
+          });
+        } else {
+          const ext = path.extname(entry.name).toLowerCase();
+          const isMd = ['.md', '.markdown', '.mdown', '.mkd', '.mdx', '.txt'].includes(ext);
+          items.push({
+            name: entry.name,
+            path: fullPath,
+            isDirectory: false,
+            extension: ext,
+            isMarkdown: isMd
+          });
+        }
+      }
+
+      // Sort: folders first, then markdown files, then others
+      return items.sort((a, b) => {
+        if (a.isDirectory && !b.isDirectory) return -1;
+        if (!a.isDirectory && b.isDirectory) return 1;
+        if (a.isMarkdown && !b.isMarkdown) return -1;
+        if (!a.isMarkdown && b.isMarkdown) return 1;
+        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+      });
+    }
+
+    const tree = await scanDirectory(resolvedDir);
+    return {
+      success: true,
+      dirPath: resolvedDir,
+      dirName: path.basename(resolvedDir),
+      tree
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// File: Watch / Unwatch
+ipcMain.handle('file:watch', (event, filePath) => {
+  if (watcherManager) {
+    watcherManager.watch(filePath);
+  }
+  return true;
+});
+
+ipcMain.handle('file:unwatch', (event, filePath) => {
+  if (watcherManager) {
+    watcherManager.unwatch(filePath);
+  }
+  return true;
+});
+
+// Export: Save HTML
+ipcMain.handle('export:html', async (event, { defaultName, htmlContent, defaultDir }) => {
+  const dir = store.getLastDirectory(defaultDir);
+  const defaultPath = dir ? path.join(dir, defaultName || 'documento.html') : (defaultName || 'documento.html');
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Exportar como HTML',
+    defaultPath,
+    filters: [{ name: 'Arquivo HTML', extensions: ['html', 'htm'] }]
+  });
+
+  if (!result.canceled && result.filePath) {
+    try {
+      await fs.promises.writeFile(result.filePath, htmlContent, 'utf-8');
+      store.setLastDirectory(path.dirname(result.filePath));
+      return { success: true, filePath: result.filePath };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+  return { canceled: true };
+});
+
+// Export: Save PDF
+ipcMain.handle('export:pdf', async (event, { defaultName, defaultDir }) => {
+  const dir = store.getLastDirectory(defaultDir);
+  const defaultPath = dir ? path.join(dir, defaultName || 'documento.pdf') : (defaultName || 'documento.pdf');
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Exportar como PDF',
+    defaultPath,
+    filters: [{ name: 'Documento PDF', extensions: ['pdf'] }]
+  });
+
+  if (!result.canceled && result.filePath) {
+    try {
+      const data = await mainWindow.webContents.printToPDF({
+        margins: {
+          marginType: 'custom',
+          top: 1,
+          bottom: 1,
+          left: 1,
+          right: 1
+        },
+        printBackground: true,
+        pageSize: 'A4'
+      });
+      await fs.promises.writeFile(result.filePath, data);
+      store.setLastDirectory(path.dirname(result.filePath));
+      return { success: true, filePath: result.filePath };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+  return { canceled: true };
+});
+
+// Settings & Store IPC
+ipcMain.handle('store:get-all', () => store.getAll());
+ipcMain.handle('store:set-all', (event, settings) => {
+  store.setAll(settings);
+  return true;
+});
+ipcMain.handle('store:remove-recent-file', (event, filePath) => {
+  store.removeRecentFile(filePath);
+  return store.getAll();
+});
+
+// Shell & Utilities
+ipcMain.handle('shell:open-external', (event, url) => {
+  if (url && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('mailto:'))) {
+    shell.openExternal(url);
+  }
+  return true;
+});
+
+ipcMain.handle('shell:show-in-folder', (event, filePath) => {
+  if (filePath && fs.existsSync(filePath)) {
+    shell.showItemInFolder(filePath);
+  }
+  return true;
+});
+
+// Get Sample Document Path
+ipcMain.handle('app:get-sample-path', () => {
+  return path.join(__dirname, '../../sample.md');
+});
+
+// Initial CLI Targets
+ipcMain.handle('app:get-initial-targets', () => {
+  const targets = [...pendingTargets];
+  pendingTargets = [];
+  return targets;
+});
+
+// App Quit
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
