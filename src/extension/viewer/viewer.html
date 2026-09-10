@@ -37,12 +37,29 @@
 
       <div class="toolbar-divider"></div>
 
+      <!-- New File -->
+      <button id="btn-new-file" class="toolbar-btn" title="Novo Arquivo Markdown (Ctrl+N)">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+          <path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586a1.75 1.75 0 0 1 1.237.513l2.914 2.914c.328.328.513.774.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.06v2.69c0 .138.112.25.25.25h2.69Z"/>
+          <path d="M8 8a.75.75 0 0 1 .75.75v1.5h1.5a.75.75 0 0 1 0 1.5h-1.5v1.5a.75.75 0 0 1-1.5 0v-1.5h-1.5a.75.75 0 0 1 0-1.5h1.5v-1.5A.75.75 0 0 1 8 8Z"/>
+        </svg>
+        <span>Novo</span>
+      </button>
+
       <!-- Open File -->
       <button id="btn-open-file" class="toolbar-btn" title="Abrir Arquivo Markdown (Ctrl+O)">
         <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
           <path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586a1.75 1.75 0 0 1 1.237.513l2.914 2.914c.328.328.513.774.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.06v2.69c0 .138.112.25.25.25h2.69Z"/>
         </svg>
         <span>Abrir</span>
+      </button>
+
+      <!-- Save File -->
+      <button id="btn-save-file" class="toolbar-btn" title="Salvar Arquivo (Ctrl+S)">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+          <path d="M2.75 1h7.465a1.75 1.75 0 0 1 1.237.513l2.035 2.035A1.75 1.75 0 0 1 14 4.785V13.25A1.75 1.75 0 0 1 12.25 15H2.75A1.75 1.75 0 0 1 1 13.25V2.75C1 1.784 1.784 1 2.75 1ZM2.5 2.75v10.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V5.414a.25.25 0 0 0-.073-.177L10.763 3.323A.25.25 0 0 0 10.586 3.25H9.5V6.25a.75.75 0 0 1-.75.75H4.25a.75.75 0 0 1-.75-.75V3.25H2.75a.25.25 0 0 0-.25.25ZM4.75 3.25v2.25h3.5V3.25h-3.5ZM4 9.5a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5A.75.75 0 0 1 4 9.5Zm.75 2.25a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5Z"/>
+        </svg>
+        <span>Salvar</span>
       </button>
 
       <!-- Open Folder -->
@@ -244,9 +261,61 @@
           </div>
         </div>
 
-        <!-- Source View Pane -->
+        <!-- Source / Editor Pane -->
         <div class="source-pane" id="source-pane">
-          <textarea class="source-textarea" id="source-textarea" spellcheck="false" placeholder="Código fonte markdown..."></textarea>
+          <!-- Formatting Toolbar -->
+          <div class="editor-toolbar" id="editor-toolbar">
+            <button class="editor-fmt-btn" id="btn-fmt-bold" title="Negrito (Ctrl+B)">
+              <strong>B</strong>
+            </button>
+            <button class="editor-fmt-btn" id="btn-fmt-italic" title="Itálico (Ctrl+I)">
+              <em>I</em>
+            </button>
+            <button class="editor-fmt-btn" id="btn-fmt-strike" title="Tachado / Riscado (~~texto~~)">
+              <s>S</s>
+            </button>
+            <button class="editor-fmt-btn" id="btn-fmt-heading" title="Título / Cabeçalho (# H1..H6)">
+              <strong>H</strong>
+            </button>
+
+            <div class="editor-fmt-divider"></div>
+
+            <button class="editor-fmt-btn" id="btn-fmt-quote" title="Citação / Blockquote (> texto)">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M1.75 3h12.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1 0-1.5Zm0 4h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5Zm0 4h12.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1 0-1.5Z"/></svg>
+            </button>
+            <button class="editor-fmt-btn" id="btn-fmt-code" title="Código em linha (`código`)">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="m5.22 3.97-3.25 3.25a.75.75 0 0 0 0 1.06l3.25 3.25a.75.75 0 0 0 1.06-1.06L3.81 8l2.47-2.47a.75.75 0 0 0-1.06-1.06Zm5.56 0a.75.75 0 0 0-1.06 1.06L12.19 8l-2.47 2.47a.75.75 0 0 0 1.06 1.06l3.25-3.25a.75.75 0 0 0 0-1.06l-3.25-3.25Z"/></svg>
+            </button>
+            <button class="editor-fmt-btn" id="btn-fmt-codeblock" title="Bloco de Código (```)">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25Zm3.03 4.22 1.47 1.47a.75.75 0 0 1 0 1.06L4.78 10.78a.75.75 0 1 1-1.06-1.06L4.44 9 3.72 8.28a.75.75 0 0 1 1.06-1.06Zm3.47 4.28h3a.75.75 0 0 1 0 1.5h-3a.75.75 0 0 1 0-1.5Z"/></svg>
+            </button>
+
+            <div class="editor-fmt-divider"></div>
+
+            <button class="editor-fmt-btn" id="btn-fmt-ul" title="Lista com Marcadores (- item)">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M2 4a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm0 4a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm0 4a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm3-7.25h9.5a.75.75 0 0 1 0 1.5H5a.75.75 0 0 1 0-1.5Zm0 4h9.5a.75.75 0 0 1 0 1.5H5a.75.75 0 0 1 0-1.5Zm0 4h9.5a.75.75 0 0 1 0 1.5H5a.75.75 0 0 1 0-1.5Z"/></svg>
+            </button>
+            <button class="editor-fmt-btn" id="btn-fmt-ol" title="Lista Numerada (1. item)">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M2.003 2.5a.5.5 0 0 0-.723-.447l-1.003.5a.5.5 0 0 0 .446.894l.28-.14V6H.5a.5.5 0 0 0 0 1h2a.5.5 0 0 0 0-1h-.497V2.5ZM5 2.75h9.5a.75.75 0 0 1 0 1.5H5a.75.75 0 0 1 0-1.5Zm0 4h9.5a.75.75 0 0 1 0 1.5H5a.75.75 0 0 1 0-1.5Zm0 4h9.5a.75.75 0 0 1 0 1.5H5a.75.75 0 0 1 0-1.5Zm-4.99 2.5c0-.6.4-1.25 1.25-1.25.6 0 1.05.4 1.05.95 0 .55-.4 1.05-.85 1.5l-.25.25h1.1a.5.5 0 0 1 0 1h-2.3a.5.5 0 0 1-.35-.85l1.05-1.05c.2-.2.35-.45.35-.6 0-.15-.15-.3-.35-.3-.2 0-.35.15-.35.35a.5.5 0 0 1-1 0Z"/></svg>
+            </button>
+            <button class="editor-fmt-btn" id="btn-fmt-task" title="Lista de Tarefas / Checklist (- [ ] item)">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M2.5 1.75a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V2.5a.75.75 0 0 1 .75-.75Zm0 4.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V7a.75.75 0 0 1 .75-.75Zm0 4.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5a.75.75 0 0 1 .75-.75ZM0 2.75C0 1.784.784 1 1.75 1h1.5C4.216 1 5 1.784 5 2.75v1.5A1.75 1.75 0 0 1 3.25 6h-1.5A1.75 1.75 0 0 1 0 4.25Zm1.75-.25a.25.25 0 0 0-.25.25v1.5c0 .138.112.25.25.25h1.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25ZM7 2.75h7.5a.75.75 0 0 1 0 1.5H7a.75.75 0 0 1 0-1.5Zm0 4h7.5a.75.75 0 0 1 0 1.5H7a.75.75 0 0 1 0-1.5Zm0 4h7.5a.75.75 0 0 1 0 1.5H7a.75.75 0 0 1 0-1.5Z"/></svg>
+            </button>
+
+            <div class="editor-fmt-divider"></div>
+
+            <button class="editor-fmt-btn" id="btn-fmt-link" title="Inserir Link (Ctrl+K)">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a2 2 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"/></svg>
+            </button>
+            <button class="editor-fmt-btn" id="btn-fmt-image" title="Inserir Imagem (![alt](url))">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M1.75 2.5h12.5a.25.25 0 0 1 .25.25v10.5a.25.25 0 0 1-.25.25H1.75a.25.25 0 0 1-.25-.25V2.75a.25.25 0 0 1 .25-.25ZM1.75 1C.784 1 0 1.784 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25V2.75A1.75 1.75 0 0 0 14.25 1ZM10.5 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Zm-9 6.5v-.81l2.88-2.88a1.25 1.25 0 0 1 1.77 0l2.47 2.47 1.88-1.88a1.25 1.25 0 0 1 1.77 0l2.25 2.25v.85a.25.25 0 0 1-.25.25H1.75a.25.25 0 0 1-.25-.25Z"/></svg>
+            </button>
+            <button class="editor-fmt-btn" id="btn-fmt-table" title="Inserir Tabela GFM">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25ZM1.5 6.5h13V1.75a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Zm5 1.5H1.5v6.25c0 .138.112.25.25.25H6.5Zm1.5 6.5h6.25a.25.25 0 0 0 .25-.25V8H8Z"/></svg>
+            </button>
+          </div>
+
+          <textarea class="source-textarea" id="source-textarea" spellcheck="false" placeholder="Comece a digitar seu documento Markdown aqui..."></textarea>
         </div>
 
         <!-- Rendered Preview Pane -->

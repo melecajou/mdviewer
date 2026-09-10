@@ -181,6 +181,11 @@ function createAppMenu() {
       label: 'Arquivo',
       submenu: [
         {
+          label: 'Novo Arquivo',
+          accelerator: 'CmdOrCtrl+N',
+          click: () => mainWindow && mainWindow.webContents.send('menu:new-file')
+        },
+        {
           label: 'Abrir Arquivo...',
           accelerator: 'CmdOrCtrl+O',
           click: () => mainWindow && mainWindow.webContents.send('menu:open-file')
@@ -189,6 +194,17 @@ function createAppMenu() {
           label: 'Abrir Pasta...',
           accelerator: 'CmdOrCtrl+Shift+O',
           click: () => mainWindow && mainWindow.webContents.send('menu:open-folder')
+        },
+        { type: 'separator' },
+        {
+          label: 'Salvar',
+          accelerator: 'CmdOrCtrl+S',
+          click: () => mainWindow && mainWindow.webContents.send('menu:save-file')
+        },
+        {
+          label: 'Salvar Como...',
+          accelerator: 'CmdOrCtrl+Shift+S',
+          click: () => mainWindow && mainWindow.webContents.send('menu:save-file-as')
         },
         { type: 'separator' },
         {
@@ -223,13 +239,19 @@ function createAppMenu() {
     {
       label: 'Editar',
       submenu: [
+        { role: 'undo', label: 'Desfazer', accelerator: 'CmdOrCtrl+Z' },
+        { role: 'redo', label: 'Refazer', accelerator: isMac ? 'Cmd+Shift+Z' : 'Ctrl+Y' },
+        { type: 'separator' },
+        { role: 'cut', label: 'Recortar' },
+        { role: 'copy', label: 'Copiar' },
+        { role: 'paste', label: 'Colar' },
+        { type: 'separator' },
         {
           label: 'Localizar no Documento',
           accelerator: 'CmdOrCtrl+F',
           click: () => mainWindow && mainWindow.webContents.send('menu:find')
         },
         { type: 'separator' },
-        { role: 'copy', label: 'Copiar' },
         { role: 'selectAll', label: 'Selecionar Tudo' }
       ]
     },
@@ -384,6 +406,93 @@ ipcMain.handle('file:read', async (event, filePath) => {
       filePath
     };
   }
+});
+
+// File: Save Content (Overwrites existing file)
+ipcMain.handle('file:save', async (event, { filePath, content }) => {
+  try {
+    if (!filePath) {
+      return { success: false, error: 'Caminho do arquivo não fornecido.' };
+    }
+    const resolvedPath = path.resolve(filePath);
+    if (watcherManager) {
+      watcherManager.ignoreNext(resolvedPath);
+    }
+    await fs.promises.writeFile(resolvedPath, content, 'utf-8');
+    const stats = await fs.promises.stat(resolvedPath);
+    store.addRecentFile(resolvedPath);
+    return {
+      success: true,
+      filePath: resolvedPath,
+      fileName: path.basename(resolvedPath),
+      dirName: path.dirname(resolvedPath),
+      size: stats.size,
+      mtime: stats.mtimeMs
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.message
+    };
+  }
+});
+
+// File: Save As Dialog
+ipcMain.handle('file:save-as', async (event, { content, defaultName, defaultDir }) => {
+  try {
+    const dir = store.getLastDirectory(defaultDir);
+    const defaultPath = dir ? path.join(dir, defaultName || 'documento.md') : (defaultName || 'documento.md');
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Salvar Arquivo Como',
+      defaultPath,
+      filters: [
+        { name: 'Arquivos Markdown (*.md)', extensions: ['md', 'markdown', 'mdown', 'mkd', 'txt'] },
+        { name: 'Todos os Arquivos', extensions: ['*'] }
+      ]
+    });
+
+    if (!result.canceled && result.filePath) {
+      const resolvedPath = path.resolve(result.filePath);
+      if (watcherManager) {
+        watcherManager.ignoreNext(resolvedPath);
+        watcherManager.watch(resolvedPath);
+      }
+      await fs.promises.writeFile(resolvedPath, content, 'utf-8');
+      const stats = await fs.promises.stat(resolvedPath);
+      store.addRecentFile(resolvedPath);
+      store.setLastDirectory(path.dirname(resolvedPath));
+      return {
+        success: true,
+        filePath: resolvedPath,
+        fileName: path.basename(resolvedPath),
+        dirName: path.dirname(resolvedPath),
+        size: stats.size,
+        mtime: stats.mtimeMs
+      };
+    }
+    return { canceled: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.message
+    };
+  }
+});
+
+// Dialog: Confirm Unsaved Changes
+ipcMain.handle('dialog:confirm-unsaved', async (event, fileName) => {
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'question',
+    buttons: ['Salvar', 'Não Salvar', 'Cancelar'],
+    defaultId: 0,
+    cancelId: 2,
+    title: 'Alterações não salvas',
+    message: `Deseja salvar as alterações feitas em "${fileName || 'documento'}" antes de continuar?`,
+    detail: 'Suas alterações serão perdidas se você não as salvar.'
+  });
+
+  // 0: Salvar, 1: Não Salvar, 2: Cancelar
+  return result.response;
 });
 
 // File: Read Directory Tree

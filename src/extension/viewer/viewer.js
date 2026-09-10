@@ -13,6 +13,8 @@ class MDViewerExtensionApp {
     this.headings = [];
     this.findMatches = [];
     this.currentFindIndex = -1;
+    this.renderDebounceTimer = null;
+    this.isSyncingScroll = false;
 
     this.init();
   }
@@ -28,7 +30,9 @@ class MDViewerExtensionApp {
   cacheElements() {
     // Toolbar & Controls
     this.btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+    this.btnNewFile = document.getElementById('btn-new-file');
     this.btnOpenFile = document.getElementById('btn-open-file');
+    this.btnSaveFile = document.getElementById('btn-save-file');
     this.btnOpenFolder = document.getElementById('btn-open-folder');
     this.btnReload = document.getElementById('btn-reload');
     this.btnViewPreview = document.getElementById('btn-view-preview');
@@ -45,6 +49,22 @@ class MDViewerExtensionApp {
     this.btnExportToggle = document.getElementById('btn-export-toggle');
     this.menuExportPdf = document.getElementById('menu-export-pdf');
     this.menuExportHtml = document.getElementById('menu-export-html');
+
+    // Editor Formatting Toolbar
+    this.editorToolbar = document.getElementById('editor-toolbar');
+    this.btnFmtBold = document.getElementById('btn-fmt-bold');
+    this.btnFmtItalic = document.getElementById('btn-fmt-italic');
+    this.btnFmtStrike = document.getElementById('btn-fmt-strike');
+    this.btnFmtHeading = document.getElementById('btn-fmt-heading');
+    this.btnFmtQuote = document.getElementById('btn-fmt-quote');
+    this.btnFmtCode = document.getElementById('btn-fmt-code');
+    this.btnFmtCodeblock = document.getElementById('btn-fmt-codeblock');
+    this.btnFmtUl = document.getElementById('btn-fmt-ul');
+    this.btnFmtOl = document.getElementById('btn-fmt-ol');
+    this.btnFmtTask = document.getElementById('btn-fmt-task');
+    this.btnFmtLink = document.getElementById('btn-fmt-link');
+    this.btnFmtImage = document.getElementById('btn-fmt-image');
+    this.btnFmtTable = document.getElementById('btn-fmt-table');
 
     // Hidden pickers
     this.hiddenFileInput = document.getElementById('hidden-file-input');
@@ -167,11 +187,57 @@ class MDViewerExtensionApp {
       btn.addEventListener('click', () => this.switchSidebarTab(btn.dataset.tab));
     });
 
-    // File Open buttons
+    // File New, Open & Save buttons
+    if (this.btnNewFile) this.btnNewFile.addEventListener('click', () => this.handleNewFile());
     this.btnOpenFile.addEventListener('click', () => this.handleOpenFile());
+    if (this.btnSaveFile) this.btnSaveFile.addEventListener('click', () => this.handleSaveFile());
     this.btnTabAdd.addEventListener('click', () => this.handleOpenFile());
     this.btnWelcomeOpenFile.addEventListener('click', () => this.handleOpenFile());
     this.btnWelcomeSample.addEventListener('click', () => this.openSampleDocument());
+
+    // Formatting Toolbar buttons
+    if (this.btnFmtBold) this.btnFmtBold.addEventListener('click', () => this.formatWrap('**', '**', 'negrito'));
+    if (this.btnFmtItalic) this.btnFmtItalic.addEventListener('click', () => this.formatWrap('*', '*', 'itálico'));
+    if (this.btnFmtStrike) this.btnFmtStrike.addEventListener('click', () => this.formatWrap('~~', '~~', 'riscado'));
+    if (this.btnFmtHeading) this.btnFmtHeading.addEventListener('click', () => this.formatHeading());
+    if (this.btnFmtQuote) this.btnFmtQuote.addEventListener('click', () => this.formatPrefix('> '));
+    if (this.btnFmtCode) this.btnFmtCode.addEventListener('click', () => this.formatWrap('`', '`', 'código'));
+    if (this.btnFmtCodeblock) this.btnFmtCodeblock.addEventListener('click', () => this.formatCodeBlock());
+    if (this.btnFmtUl) this.btnFmtUl.addEventListener('click', () => this.formatPrefix('- '));
+    if (this.btnFmtOl) this.btnFmtOl.addEventListener('click', () => this.formatPrefix('1. '));
+    if (this.btnFmtTask) this.btnFmtTask.addEventListener('click', () => this.formatPrefix('- [ ] '));
+    if (this.btnFmtLink) this.btnFmtLink.addEventListener('click', () => this.formatLink());
+    if (this.btnFmtImage) this.btnFmtImage.addEventListener('click', () => this.formatImage());
+    if (this.btnFmtTable) this.btnFmtTable.addEventListener('click', () => this.formatTable());
+
+    // Editor Textarea Events
+    this.sourceTextarea.addEventListener('input', () => this.handleEditorInput());
+    this.sourceTextarea.addEventListener('keydown', (e) => this.handleEditorKeydown(e));
+
+    // Synchronized Scrolling in Split Mode
+    this.sourceTextarea.addEventListener('scroll', () => {
+      if (this.viewMode !== 'split' || this.isSyncingScroll) return;
+      this.isSyncingScroll = true;
+      const maxTextarea = this.sourceTextarea.scrollHeight - this.sourceTextarea.clientHeight;
+      const maxPreview = this.previewPane.scrollHeight - this.previewPane.clientHeight;
+      if (maxTextarea > 0 && maxPreview > 0) {
+        const pct = this.sourceTextarea.scrollTop / maxTextarea;
+        this.previewPane.scrollTop = pct * maxPreview;
+      }
+      setTimeout(() => { this.isSyncingScroll = false; }, 40);
+    });
+
+    this.previewPane.addEventListener('scroll', () => {
+      if (this.viewMode !== 'split' || this.isSyncingScroll) return;
+      this.isSyncingScroll = true;
+      const maxTextarea = this.sourceTextarea.scrollHeight - this.sourceTextarea.clientHeight;
+      const maxPreview = this.previewPane.scrollHeight - this.previewPane.clientHeight;
+      if (maxTextarea > 0 && maxPreview > 0) {
+        const pct = this.previewPane.scrollTop / maxPreview;
+        this.sourceTextarea.scrollTop = pct * maxTextarea;
+      }
+      setTimeout(() => { this.isSyncingScroll = false; }, 40);
+    });
 
     // Hidden input change
     this.hiddenFileInput.addEventListener('change', (e) => {
@@ -291,36 +357,37 @@ class MDViewerExtensionApp {
       }
     });
 
-    // Edição de código fonte no textarea atualiza preview
-    this.sourceTextarea.addEventListener('input', () => {
-      const activeTab = this.getActiveTab();
-      if (activeTab) {
-        activeTab.content = this.sourceTextarea.value;
-        activeTab.isDirty = true;
-        this.renderMarkdown(activeTab.content);
-      }
-    });
-
     // Teclas de atalho globais
     document.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'o' && !e.shiftKey) {
+      const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+      const isEditorFocused = document.activeElement === this.sourceTextarea;
+
+      if (isCmdOrCtrl && e.key.toLowerCase() === 'n' && !e.shiftKey) {
+        e.preventDefault();
+        this.handleNewFile();
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === 's' && !e.shiftKey) {
+        e.preventDefault();
+        this.handleSaveFile();
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'o' && !e.shiftKey) {
         e.preventDefault();
         this.handleOpenFile();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'w') {
         e.preventDefault();
         if (this.activeTabId) this.closeTab(this.activeTabId);
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'r') {
         e.preventDefault();
         this.reloadActiveTab();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'f') {
         e.preventDefault();
         this.openFindBar();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'p') {
         e.preventDefault();
         this.exportToPdf();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
-        e.preventDefault();
-        this.toggleSidebar();
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'b') {
+        if (!isEditorFocused) {
+          e.preventDefault();
+          this.toggleSidebar();
+        }
       } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
         e.preventDefault();
         this.switchSidebarTab('toc');
@@ -754,6 +821,7 @@ class MDViewerExtensionApp {
       title: title || 'Sem Título.md',
       path: path,
       content: content,
+      savedContent: content,
       fileHandle: fileHandle,
       isDirty: false,
       scrollPos: 0
@@ -776,7 +844,8 @@ class MDViewerExtensionApp {
 
     this.tabs.forEach(tab => {
       const tabEl = document.createElement('div');
-      tabEl.className = `tab-item ${tab.id === this.activeTabId ? 'active' : ''}`;
+      tabEl.className = `tab-item ${tab.id === this.activeTabId ? 'active' : ''} ${tab.isDirty ? 'dirty' : ''}`;
+      tabEl.id = `tab-${tab.id}`;
       tabEl.title = tab.path;
       tabEl.innerHTML = `
         <span class="tab-title">${tab.title}</span>
@@ -831,7 +900,7 @@ class MDViewerExtensionApp {
     this.sourceTextarea.value = tab.content;
     this.renderMarkdown(tab.content);
     this.statusFilePath.textContent = tab.path;
-    document.title = `${tab.title} - MDViewer Workspace`;
+    document.title = `${tab.isDirty ? '● ' : ''}${tab.title} - MDViewer Workspace`;
 
     if (!this.currentFolder) {
       this.filterFileTree(this.explorerSearch.value);
@@ -870,6 +939,13 @@ class MDViewerExtensionApp {
     const index = this.tabs.findIndex(t => t.id === tabId);
     if (index === -1) return;
 
+    const tab = this.tabs[index];
+    if (tab.isDirty) {
+      if (!confirm(`O documento "${tab.title}" possui alterações não salvas. Deseja fechar mesmo assim?`)) {
+        return;
+      }
+    }
+
     this.tabs.splice(index, 1);
     if (this.activeTabId === tabId) {
       if (this.tabs.length > 0) {
@@ -901,19 +977,376 @@ class MDViewerExtensionApp {
   async reloadActiveTab() {
     const tab = this.getActiveTab();
     if (!tab) return;
+    if (tab.isDirty) return;
 
     if (tab.fileHandle) {
       try {
         const file = await tab.fileHandle.getFile();
         tab.content = await file.text();
+        tab.savedContent = tab.content;
         this.sourceTextarea.value = tab.content;
         this.renderMarkdown(tab.content);
-      } catch (e) {
-        console.warn('Não foi possível recarregar arquivo:', e);
+      } catch (err) {
+        console.error('Erro ao recarregar aba:', err);
       }
-    } else {
-      this.renderMarkdown(tab.content);
     }
+  }
+
+  // ---------------- Editor & Document Management ----------------
+
+  handleNewFile() {
+    this.openDocumentTab('Sem Título.md', '# Novo Documento\n\nComece a escrever aqui...\n', 'novo-' + Date.now() + '.md');
+    const activeTab = this.getActiveTab();
+    if (activeTab) {
+      activeTab.savedContent = '';
+      this.updateTabDirty(activeTab, true);
+    }
+    if (this.viewMode === 'preview') {
+      this.setViewMode('split');
+    }
+    this.sourceTextarea.focus();
+    this.sourceTextarea.setSelectionRange(this.sourceTextarea.value.length, this.sourceTextarea.value.length);
+  }
+
+  async handleSaveFile() {
+    const activeTab = this.getActiveTab();
+    if (!activeTab) return;
+    return await this.saveTab(activeTab);
+  }
+
+  async saveTab(tab) {
+    if (!tab) return false;
+    try {
+      if (tab.fileHandle) {
+        const writable = await tab.fileHandle.createWritable();
+        await writable.write(tab.content);
+        await writable.close();
+        tab.savedContent = tab.content;
+        this.updateTabDirty(tab, false);
+        this.showSaveFeedback('Salvo!');
+        return true;
+      } else if ('showSaveFilePicker' in window) {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: tab.title || 'documento.md',
+          types: [{
+            description: 'Arquivos Markdown',
+            accept: { 'text/markdown': ['.md', '.markdown'] }
+          }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(tab.content);
+        await writable.close();
+        tab.fileHandle = handle;
+        tab.title = handle.name;
+        tab.path = handle.name;
+        tab.savedContent = tab.content;
+        this.updateTabDirty(tab, false);
+        this.renderTabsBar();
+        this.showSaveFeedback('Salvo!');
+        return true;
+      } else {
+        const blob = new Blob([tab.content], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = tab.title || 'documento.md';
+        a.click();
+        URL.revokeObjectURL(url);
+        tab.savedContent = tab.content;
+        this.updateTabDirty(tab, false);
+        this.showSaveFeedback('Baixado!');
+        return true;
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        alert('Erro ao salvar arquivo: ' + err.message);
+      }
+      return false;
+    }
+  }
+
+  updateTabDirty(tab, isDirty) {
+    tab.isDirty = isDirty;
+    const tabEl = document.getElementById(`tab-${tab.id}`);
+    if (tabEl) {
+      tabEl.classList.toggle('dirty', isDirty);
+    }
+    if (this.activeTabId === tab.id) {
+      document.title = `${isDirty ? '● ' : ''}${tab.title} - MDViewer Workspace`;
+    }
+  }
+
+  showSaveFeedback(text = 'Salvo!') {
+    const span = this.btnSaveFile?.querySelector('span');
+    if (span) {
+      const orig = span.textContent;
+      span.textContent = text;
+      this.btnSaveFile.style.color = '#3fb950';
+      setTimeout(() => {
+        span.textContent = orig;
+        this.btnSaveFile.style.color = '';
+      }, 1500);
+    }
+  }
+
+  handleEditorInput() {
+    const activeTab = this.getActiveTab();
+    if (!activeTab) return;
+
+    activeTab.content = this.sourceTextarea.value;
+    const isDirty = activeTab.content !== activeTab.savedContent;
+    if (activeTab.isDirty !== isDirty) {
+      this.updateTabDirty(activeTab, isDirty);
+    }
+
+    clearTimeout(this.renderDebounceTimer);
+    this.renderDebounceTimer = setTimeout(() => {
+      this.renderMarkdown(activeTab.content);
+    }, 150);
+  }
+
+  handleEditorKeydown(e) {
+    const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+
+    if (isCmdOrCtrl && e.key.toLowerCase() === 'b') {
+      e.preventDefault();
+      this.formatWrap('**', '**', 'negrito');
+    } else if (isCmdOrCtrl && e.key.toLowerCase() === 'i') {
+      e.preventDefault();
+      this.formatWrap('*', '*', 'itálico');
+    } else if (isCmdOrCtrl && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      this.formatLink();
+    } else if (isCmdOrCtrl && e.shiftKey && e.key.toLowerCase() === 'c') {
+      e.preventDefault();
+      this.formatCodeBlock();
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      this.handleTabKey(e.shiftKey);
+    } else if (e.key === 'Enter') {
+      this.handleEnterKey(e);
+    }
+  }
+
+  handleTabKey(isShift) {
+    const textarea = this.sourceTextarea;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const val = textarea.value;
+
+    if (start === end && !isShift) {
+      this.insertTextAtCursor('  ');
+      return;
+    }
+
+    const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+    const lineEnd = val.indexOf('\n', end);
+    const block = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);
+    const lines = block.split('\n');
+
+    let newLines;
+    if (isShift) {
+      newLines = lines.map(l => l.startsWith('  ') ? l.substring(2) : (l.startsWith(' ') ? l.substring(1) : l));
+    } else {
+      newLines = lines.map(l => '  ' + l);
+    }
+
+    textarea.setSelectionRange(lineStart, lineEnd === -1 ? val.length : lineEnd);
+    this.insertTextAtCursor(newLines.join('\n'));
+  }
+
+  handleEnterKey(e) {
+    const textarea = this.sourceTextarea;
+    const start = textarea.selectionStart;
+    const val = textarea.value;
+    const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+    const currentLine = val.substring(lineStart, start);
+
+    const taskMatch = currentLine.match(/^(\s*)(- \[[ xX]\]\s+)(.*)/);
+    const bulletMatch = currentLine.match(/^(\s*)([-*+]\s+)(.*)/);
+    const numberMatch = currentLine.match(/^(\s*)(\d+)\.\s+(.*)/);
+
+    if (taskMatch) {
+      e.preventDefault();
+      if (taskMatch[3].trim() === '') {
+        textarea.setSelectionRange(lineStart, start);
+        this.insertTextAtCursor('');
+      } else {
+        this.insertTextAtCursor('\n' + taskMatch[1] + '- [ ] ');
+      }
+    } else if (bulletMatch) {
+      e.preventDefault();
+      if (bulletMatch[3].trim() === '') {
+        textarea.setSelectionRange(lineStart, start);
+        this.insertTextAtCursor('');
+      } else {
+        this.insertTextAtCursor('\n' + bulletMatch[1] + bulletMatch[2]);
+      }
+    } else if (numberMatch) {
+      e.preventDefault();
+      if (numberMatch[3].trim() === '') {
+        textarea.setSelectionRange(lineStart, start);
+        this.insertTextAtCursor('');
+      } else {
+        const nextNum = parseInt(numberMatch[2], 10) + 1;
+        this.insertTextAtCursor('\n' + numberMatch[1] + nextNum + '. ');
+      }
+    }
+  }
+
+  insertTextAtCursor(text, selectOffset = 0, selectLength = 0) {
+    const textarea = this.sourceTextarea;
+    textarea.focus();
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    if (document.queryCommandSupported && document.queryCommandSupported('insertText')) {
+      document.execCommand('insertText', false, text);
+    } else {
+      const val = textarea.value;
+      textarea.value = val.substring(0, start) + text + val.substring(end);
+      textarea.selectionStart = start + text.length;
+      textarea.selectionEnd = start + text.length;
+    }
+
+    if (selectLength > 0) {
+      textarea.selectionStart = start + selectOffset;
+      textarea.selectionEnd = start + selectOffset + selectLength;
+    } else if (selectOffset > 0) {
+      textarea.selectionStart = start + selectOffset;
+      textarea.selectionEnd = start + selectOffset;
+    }
+
+    this.handleEditorInput();
+  }
+
+  formatWrap(before, after, defaultText = 'texto') {
+    const textarea = this.sourceTextarea;
+    textarea.focus();
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const val = textarea.value;
+    const selectedText = val.substring(start, end);
+
+    if (selectedText.length > 0) {
+      if (
+        val.substring(start - before.length, start) === before &&
+        val.substring(end, end + after.length) === after
+      ) {
+        textarea.selectionStart = start - before.length;
+        textarea.selectionEnd = end + after.length;
+        this.insertTextAtCursor(selectedText, 0, selectedText.length);
+        return;
+      }
+      const replacement = `${before}${selectedText}${after}`;
+      this.insertTextAtCursor(replacement, before.length, selectedText.length);
+    } else {
+      const replacement = `${before}${defaultText}${after}`;
+      this.insertTextAtCursor(replacement, before.length, defaultText.length);
+    }
+  }
+
+  formatHeading() {
+    const textarea = this.sourceTextarea;
+    textarea.focus();
+    const start = textarea.selectionStart;
+    const val = textarea.value;
+
+    const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+    const lineEnd = val.indexOf('\n', start);
+    const currentLine = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);
+
+    let newLine = '';
+    if (currentLine.startsWith('### ')) {
+      newLine = currentLine.substring(4);
+    } else if (currentLine.startsWith('## ')) {
+      newLine = '### ' + currentLine.substring(3);
+    } else if (currentLine.startsWith('# ')) {
+      newLine = '## ' + currentLine.substring(2);
+    } else {
+      newLine = '# ' + currentLine.replace(/^#+\s*/, '');
+    }
+
+    textarea.setSelectionRange(lineStart, lineEnd === -1 ? val.length : lineEnd);
+    this.insertTextAtCursor(newLine);
+  }
+
+  formatPrefix(prefix) {
+    const textarea = this.sourceTextarea;
+    textarea.focus();
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const val = textarea.value;
+
+    const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+    const lineEnd = val.indexOf('\n', end);
+    const block = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);
+    const lines = block.split('\n');
+
+    const allHavePrefix = lines.every(l => l.startsWith(prefix));
+    const newLines = lines.map((l, i) => {
+      if (allHavePrefix) {
+        return l.substring(prefix.length);
+      } else {
+        if (prefix === '1. ') {
+          return `${i + 1}. ${l.replace(/^(\d+\. |- |\* |\+ |- \[[ xX]\] )\s*/, '')}`;
+        }
+        return `${prefix}${l.replace(/^(\d+\. |- |\* |\+ |- \[[ xX]\] )\s*/, '')}`;
+      }
+    });
+
+    textarea.setSelectionRange(lineStart, lineEnd === -1 ? val.length : lineEnd);
+    this.insertTextAtCursor(newLines.join('\n'));
+  }
+
+  formatLink() {
+    const textarea = this.sourceTextarea;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value.substring(start, end) || 'texto do link';
+    this.insertTextAtCursor(`[${text}](https://exemplo.com)`, text.length + 3, 19);
+  }
+
+  formatImage() {
+    const textarea = this.sourceTextarea;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value.substring(start, end) || 'legenda';
+    this.insertTextAtCursor(`![${text}](caminho/para/imagem.png)`, text.length + 4, 22);
+  }
+
+  formatCodeBlock() {
+    const textarea = this.sourceTextarea;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value.substring(start, end) || '// código aqui';
+    const snippet = `\`\`\`javascript\n${text}\n\`\`\`\n`;
+    this.insertTextAtCursor(snippet, 3, 10);
+  }
+
+  formatTable() {
+    const snippet = `| Coluna 1 | Coluna 2 | Coluna 3 |\n| :--- | :--- | :--- |\n| Item 1 | Valor A | 100 |\n| Item 2 | Valor B | 200 |\n`;
+    this.insertTextAtCursor(snippet);
+  }
+
+  toggleTaskCheckbox(taskIndex, isChecked) {
+    const activeTab = this.getActiveTab();
+    if (!activeTab) return;
+
+    let currentIndex = 0;
+    const regex = /^(\s*[-*+]\s+\[)([ xX])(\]\s+.*)$/gm;
+    activeTab.content = activeTab.content.replace(regex, (match, prefix, checkState, suffix) => {
+      if (currentIndex === taskIndex) {
+        currentIndex++;
+        return `${prefix}${isChecked ? 'x' : ' '}${suffix}`;
+      }
+      currentIndex++;
+      return match;
+    });
+
+    this.sourceTextarea.value = activeTab.content;
+    const isDirty = activeTab.content !== activeTab.savedContent;
+    this.updateTabDirty(activeTab, isDirty);
   }
 
   async checkActiveTabUpdates() {
@@ -1017,6 +1450,16 @@ class MDViewerExtensionApp {
       img.addEventListener('click', () => {
         this.lightboxImg.src = img.src;
         this.lightboxModal.classList.add('visible');
+      });
+    });
+
+    // Setup interactive task checkboxes in preview
+    const taskCheckboxes = this.markdownContainer.querySelectorAll('.task-list-item input[type="checkbox"]');
+    taskCheckboxes.forEach((chk, index) => {
+      chk.removeAttribute('disabled');
+      chk.style.cursor = 'pointer';
+      chk.addEventListener('change', () => {
+        this.toggleTaskCheckbox(index, chk.checked);
       });
     });
 

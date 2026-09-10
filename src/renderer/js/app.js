@@ -13,6 +13,8 @@ class MDViewerApp {
     this.headings = [];
     this.findMatches = [];
     this.currentFindIndex = -1;
+    this.renderDebounceTimer = null;
+    this.isSyncingScroll = false;
 
     this.init();
   }
@@ -29,7 +31,9 @@ class MDViewerApp {
   cacheElements() {
     // Toolbar & Controls
     this.btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+    this.btnNewFile = document.getElementById('btn-new-file');
     this.btnOpenFile = document.getElementById('btn-open-file');
+    this.btnSaveFile = document.getElementById('btn-save-file');
     this.btnOpenFolder = document.getElementById('btn-open-folder');
     this.btnReload = document.getElementById('btn-reload');
     this.btnViewPreview = document.getElementById('btn-view-preview');
@@ -46,6 +50,22 @@ class MDViewerApp {
     this.btnExportToggle = document.getElementById('btn-export-toggle');
     this.menuExportPdf = document.getElementById('menu-export-pdf');
     this.menuExportHtml = document.getElementById('menu-export-html');
+
+    // Editor Formatting Toolbar
+    this.editorToolbar = document.getElementById('editor-toolbar');
+    this.btnFmtBold = document.getElementById('btn-fmt-bold');
+    this.btnFmtItalic = document.getElementById('btn-fmt-italic');
+    this.btnFmtStrike = document.getElementById('btn-fmt-strike');
+    this.btnFmtHeading = document.getElementById('btn-fmt-heading');
+    this.btnFmtQuote = document.getElementById('btn-fmt-quote');
+    this.btnFmtCode = document.getElementById('btn-fmt-code');
+    this.btnFmtCodeblock = document.getElementById('btn-fmt-codeblock');
+    this.btnFmtUl = document.getElementById('btn-fmt-ul');
+    this.btnFmtOl = document.getElementById('btn-fmt-ol');
+    this.btnFmtTask = document.getElementById('btn-fmt-task');
+    this.btnFmtLink = document.getElementById('btn-fmt-link');
+    this.btnFmtImage = document.getElementById('btn-fmt-image');
+    this.btnFmtTable = document.getElementById('btn-fmt-table');
 
     // Sidebar
     this.appSidebar = document.getElementById('app-sidebar');
@@ -155,11 +175,57 @@ class MDViewerApp {
       btn.addEventListener('click', () => this.switchSidebarTab(btn.dataset.tab));
     });
 
-    // File Open buttons
+    // File New, Open & Save buttons
+    if (this.btnNewFile) this.btnNewFile.addEventListener('click', () => this.handleNewFile());
     this.btnOpenFile.addEventListener('click', () => this.handleOpenFile());
+    if (this.btnSaveFile) this.btnSaveFile.addEventListener('click', () => this.handleSaveFile());
     this.btnTabAdd.addEventListener('click', () => this.handleOpenFile());
     this.btnWelcomeOpenFile.addEventListener('click', () => this.handleOpenFile());
     this.btnWelcomeSample.addEventListener('click', () => this.openSampleDocument());
+
+    // Formatting Toolbar buttons
+    if (this.btnFmtBold) this.btnFmtBold.addEventListener('click', () => this.formatWrap('**', '**', 'negrito'));
+    if (this.btnFmtItalic) this.btnFmtItalic.addEventListener('click', () => this.formatWrap('*', '*', 'itálico'));
+    if (this.btnFmtStrike) this.btnFmtStrike.addEventListener('click', () => this.formatWrap('~~', '~~', 'riscado'));
+    if (this.btnFmtHeading) this.btnFmtHeading.addEventListener('click', () => this.formatHeading());
+    if (this.btnFmtQuote) this.btnFmtQuote.addEventListener('click', () => this.formatPrefix('> '));
+    if (this.btnFmtCode) this.btnFmtCode.addEventListener('click', () => this.formatWrap('`', '`', 'código'));
+    if (this.btnFmtCodeblock) this.btnFmtCodeblock.addEventListener('click', () => this.formatCodeBlock());
+    if (this.btnFmtUl) this.btnFmtUl.addEventListener('click', () => this.formatPrefix('- '));
+    if (this.btnFmtOl) this.btnFmtOl.addEventListener('click', () => this.formatPrefix('1. '));
+    if (this.btnFmtTask) this.btnFmtTask.addEventListener('click', () => this.formatPrefix('- [ ] '));
+    if (this.btnFmtLink) this.btnFmtLink.addEventListener('click', () => this.formatLink());
+    if (this.btnFmtImage) this.btnFmtImage.addEventListener('click', () => this.formatImage());
+    if (this.btnFmtTable) this.btnFmtTable.addEventListener('click', () => this.formatTable());
+
+    // Editor Textarea Events
+    this.sourceTextarea.addEventListener('input', () => this.handleEditorInput());
+    this.sourceTextarea.addEventListener('keydown', (e) => this.handleEditorKeydown(e));
+
+    // Synchronized Scrolling in Split Mode
+    this.sourceTextarea.addEventListener('scroll', () => {
+      if (this.viewMode !== 'split' || this.isSyncingScroll) return;
+      this.isSyncingScroll = true;
+      const maxTextarea = this.sourceTextarea.scrollHeight - this.sourceTextarea.clientHeight;
+      const maxPreview = this.previewPane.scrollHeight - this.previewPane.clientHeight;
+      if (maxTextarea > 0 && maxPreview > 0) {
+        const pct = this.sourceTextarea.scrollTop / maxTextarea;
+        this.previewPane.scrollTop = pct * maxPreview;
+      }
+      setTimeout(() => { this.isSyncingScroll = false; }, 40);
+    });
+
+    this.previewPane.addEventListener('scroll', () => {
+      if (this.viewMode !== 'split' || this.isSyncingScroll) return;
+      this.isSyncingScroll = true;
+      const maxTextarea = this.sourceTextarea.scrollHeight - this.sourceTextarea.clientHeight;
+      const maxPreview = this.previewPane.scrollHeight - this.previewPane.clientHeight;
+      if (maxTextarea > 0 && maxPreview > 0) {
+        const pct = this.previewPane.scrollTop / maxPreview;
+        this.sourceTextarea.scrollTop = pct * maxTextarea;
+      }
+      setTimeout(() => { this.isSyncingScroll = false; }, 40);
+    });
 
     // Folder Open buttons
     this.btnOpenFolder.addEventListener('click', () => this.handleOpenFolder());
@@ -266,8 +332,18 @@ class MDViewerApp {
     // Global Keyboard Shortcuts
     window.addEventListener('keydown', (e) => {
       const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+      const isEditorFocused = document.activeElement === this.sourceTextarea;
       
-      if (isCmdOrCtrl && e.key.toLowerCase() === 'o' && !e.shiftKey) {
+      if (isCmdOrCtrl && e.key.toLowerCase() === 'n' && !e.shiftKey) {
+        e.preventDefault();
+        this.handleNewFile();
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === 's' && !e.shiftKey) {
+        e.preventDefault();
+        this.handleSaveFile();
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === 's' && e.shiftKey) {
+        e.preventDefault();
+        this.handleSaveFileAs();
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'o' && !e.shiftKey) {
         e.preventDefault();
         this.handleOpenFile();
       } else if (isCmdOrCtrl && e.key.toLowerCase() === 'o' && e.shiftKey) {
@@ -283,8 +359,10 @@ class MDViewerApp {
         e.preventDefault();
         this.openFindBar();
       } else if (isCmdOrCtrl && e.key.toLowerCase() === 'b') {
-        e.preventDefault();
-        this.toggleSidebar();
+        if (!isEditorFocused) {
+          e.preventDefault();
+          this.toggleSidebar();
+        }
       } else if (isCmdOrCtrl && e.key.toLowerCase() === 'p') {
         e.preventDefault();
         this.exportToPdf();
@@ -344,7 +422,10 @@ class MDViewerApp {
     });
 
     // Native Menu Actions
+    window.electronAPI.onMenuAction('new-file', () => this.handleNewFile());
     window.electronAPI.onMenuAction('open-file', () => this.handleOpenFile());
+    window.electronAPI.onMenuAction('save-file', () => this.handleSaveFile());
+    window.electronAPI.onMenuAction('save-file-as', () => this.handleSaveFileAs());
     window.electronAPI.onMenuAction('open-folder', () => this.handleOpenFolder());
     window.electronAPI.onMenuAction('close-tab', () => this.activeTabId && this.closeTab(this.activeTabId));
     window.electronAPI.onMenuAction('reload-file', () => this.reloadActiveTab());
@@ -398,6 +479,8 @@ class MDViewerApp {
       fileName: res.fileName,
       dirName: res.dirName,
       content: res.content,
+      savedContent: res.content,
+      isDirty: false,
       scrollPos: 0
     };
 
@@ -412,9 +495,9 @@ class MDViewerApp {
 
   createTabElement(tab) {
     const tabEl = document.createElement('div');
-    tabEl.className = 'tab-item';
+    tabEl.className = `tab-item ${tab.isDirty ? 'dirty' : ''}`;
     tabEl.id = `tab-el-${tab.id}`;
-    tabEl.title = tab.filePath;
+    tabEl.title = tab.filePath || tab.fileName;
 
     const titleEl = document.createElement('span');
     titleEl.className = 'tab-title';
@@ -468,17 +551,33 @@ class MDViewerApp {
     }, 10);
 
     // Update window title & status
-    document.title = `${targetTab.fileName} - MDViewer`;
-    this.statusFilePath.textContent = targetTab.filePath;
-    this.syncFolderWithActiveFile(targetTab.filePath);
+    document.title = `${targetTab.isDirty ? '● ' : ''}${targetTab.fileName} - MDViewer`;
+    this.statusFilePath.textContent = targetTab.filePath || 'Sem Título (Não Salvo)';
+    if (targetTab.filePath) {
+      this.syncFolderWithActiveFile(targetTab.filePath);
+    }
   }
 
-  closeTab(tabId) {
+  async closeTab(tabId) {
     const tabIdx = this.tabs.findIndex(t => t.id === tabId);
     if (tabIdx === -1) return;
 
     const tab = this.tabs[tabIdx];
-    window.electronAPI.unwatchFile(tab.filePath);
+    if (tab.isDirty) {
+      // 0: Salvar, 1: Não Salvar, 2: Cancelar
+      const choice = await window.electronAPI.confirmUnsaved(tab.fileName);
+      if (choice === 2) {
+        return; // Cancelado
+      }
+      if (choice === 0) {
+        const saved = await this.saveTab(tab);
+        if (!saved) return;
+      }
+    }
+
+    if (tab.filePath) {
+      window.electronAPI.unwatchFile(tab.filePath);
+    }
 
     // Remove Tab DOM
     const tabEl = document.getElementById(`tab-el-${tab.id}`);
@@ -508,11 +607,17 @@ class MDViewerApp {
   async reloadTab(tabId, preserveScroll = true) {
     const tab = this.tabs.find(t => t.id === tabId);
     if (!tab) return;
+    if (tab.isDirty) {
+      console.warn('Skipping auto-reload because tab has unsaved changes:', tab.filePath);
+      return;
+    }
 
     const savedScroll = this.previewPane.scrollTop;
     const res = await window.electronAPI.readFile(tab.filePath);
     if (res.success) {
       tab.content = res.content;
+      tab.savedContent = res.content;
+      this.updateTabDirty(tab, false);
       if (this.activeTabId === tabId) {
         this.sourceTextarea.value = tab.content;
         this.renderMarkdown(tab);
@@ -527,6 +632,380 @@ class MDViewerApp {
     if (this.activeTabId) {
       this.reloadTab(this.activeTabId, true);
     }
+  }
+
+  // ---------------- Editor & Document Management ----------------
+
+  handleNewFile() {
+    const tabId = 'tab_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+    const newTab = {
+      id: tabId,
+      filePath: null,
+      fileName: 'Sem Título.md',
+      dirName: this.currentFolder || null,
+      content: '# Novo Documento\n\nComece a escrever aqui...\n',
+      savedContent: '',
+      isDirty: true,
+      scrollPos: 0
+    };
+
+    this.tabs.push(newTab);
+    this.createTabElement(newTab);
+    this.switchTab(tabId);
+
+    // If in preview mode, switch to split mode so editor is immediately visible
+    if (this.viewMode === 'preview') {
+      this.setViewMode('split');
+    }
+    this.sourceTextarea.focus();
+    this.sourceTextarea.setSelectionRange(this.sourceTextarea.value.length, this.sourceTextarea.value.length);
+  }
+
+  async handleSaveFile() {
+    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    if (!activeTab) return;
+    return await this.saveTab(activeTab);
+  }
+
+  async handleSaveFileAs() {
+    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    if (!activeTab) return;
+    return await this.saveTabAs(activeTab);
+  }
+
+  async saveTab(tab) {
+    if (!tab) return false;
+    if (!tab.filePath) {
+      return await this.saveTabAs(tab);
+    }
+
+    const res = await window.electronAPI.saveFile(tab.filePath, tab.content);
+    if (res.success) {
+      tab.savedContent = tab.content;
+      this.updateTabDirty(tab, false);
+      this.showSaveFeedback('Salvo!');
+      return true;
+    } else {
+      alert(`Erro ao salvar arquivo:\n${res.error}`);
+      return false;
+    }
+  }
+
+  async saveTabAs(tab) {
+    if (!tab) return false;
+    const defaultDir = tab.dirName || this.currentFolder;
+    const defaultName = tab.fileName || 'documento.md';
+    const res = await window.electronAPI.saveFileAs(tab.content, defaultName, defaultDir);
+
+    if (res && res.success) {
+      tab.filePath = res.filePath;
+      tab.fileName = res.fileName;
+      tab.dirName = res.dirName;
+      tab.savedContent = tab.content;
+      this.updateTabDirty(tab, false);
+
+      const tabEl = document.getElementById(`tab-el-${tab.id}`);
+      if (tabEl) {
+        const titleEl = tabEl.querySelector('.tab-title');
+        if (titleEl) titleEl.textContent = tab.fileName;
+        tabEl.title = tab.filePath;
+      }
+
+      if (this.activeTabId === tab.id) {
+        document.title = `${tab.fileName} - MDViewer`;
+        this.statusFilePath.textContent = tab.filePath;
+      }
+
+      window.electronAPI.watchFile(tab.filePath);
+      this.renderRecentFiles();
+      this.showSaveFeedback('Salvo!');
+      return true;
+    }
+    return false;
+  }
+
+  updateTabDirty(tab, isDirty) {
+    tab.isDirty = isDirty;
+    const tabEl = document.getElementById(`tab-el-${tab.id}`);
+    if (tabEl) {
+      tabEl.classList.toggle('dirty', isDirty);
+    }
+    if (this.activeTabId === tab.id) {
+      document.title = `${isDirty ? '● ' : ''}${tab.fileName} - MDViewer`;
+    }
+  }
+
+  showSaveFeedback(text = 'Salvo!') {
+    const span = this.btnSaveFile?.querySelector('span');
+    if (span) {
+      const orig = span.textContent;
+      span.textContent = text;
+      this.btnSaveFile.style.color = '#3fb950';
+      setTimeout(() => {
+        span.textContent = orig;
+        this.btnSaveFile.style.color = '';
+      }, 1500);
+    }
+  }
+
+  handleEditorInput() {
+    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    if (!activeTab) return;
+
+    activeTab.content = this.sourceTextarea.value;
+    const isDirty = activeTab.content !== activeTab.savedContent;
+    if (activeTab.isDirty !== isDirty) {
+      this.updateTabDirty(activeTab, isDirty);
+    }
+
+    clearTimeout(this.renderDebounceTimer);
+    this.renderDebounceTimer = setTimeout(() => {
+      this.renderMarkdown(activeTab);
+    }, 150);
+  }
+
+  handleEditorKeydown(e) {
+    const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+
+    if (isCmdOrCtrl && e.key.toLowerCase() === 'b') {
+      e.preventDefault();
+      this.formatWrap('**', '**', 'negrito');
+    } else if (isCmdOrCtrl && e.key.toLowerCase() === 'i') {
+      e.preventDefault();
+      this.formatWrap('*', '*', 'itálico');
+    } else if (isCmdOrCtrl && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      this.formatLink();
+    } else if (isCmdOrCtrl && e.shiftKey && e.key.toLowerCase() === 'c') {
+      e.preventDefault();
+      this.formatCodeBlock();
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      this.handleTabKey(e.shiftKey);
+    } else if (e.key === 'Enter') {
+      this.handleEnterKey(e);
+    }
+  }
+
+  handleTabKey(isShift) {
+    const textarea = this.sourceTextarea;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const val = textarea.value;
+
+    if (start === end && !isShift) {
+      this.insertTextAtCursor('  ');
+      return;
+    }
+
+    const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+    const lineEnd = val.indexOf('\n', end);
+    const block = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);
+    const lines = block.split('\n');
+
+    let newLines;
+    if (isShift) {
+      newLines = lines.map(l => l.startsWith('  ') ? l.substring(2) : (l.startsWith(' ') ? l.substring(1) : l));
+    } else {
+      newLines = lines.map(l => '  ' + l);
+    }
+
+    textarea.setSelectionRange(lineStart, lineEnd === -1 ? val.length : lineEnd);
+    this.insertTextAtCursor(newLines.join('\n'));
+  }
+
+  handleEnterKey(e) {
+    const textarea = this.sourceTextarea;
+    const start = textarea.selectionStart;
+    const val = textarea.value;
+    const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+    const currentLine = val.substring(lineStart, start);
+
+    const taskMatch = currentLine.match(/^(\s*)(- \[[ xX]\]\s+)(.*)/);
+    const bulletMatch = currentLine.match(/^(\s*)([-*+]\s+)(.*)/);
+    const numberMatch = currentLine.match(/^(\s*)(\d+)\.\s+(.*)/);
+
+    if (taskMatch) {
+      e.preventDefault();
+      if (taskMatch[3].trim() === '') {
+        textarea.setSelectionRange(lineStart, start);
+        this.insertTextAtCursor('');
+      } else {
+        this.insertTextAtCursor('\n' + taskMatch[1] + '- [ ] ');
+      }
+    } else if (bulletMatch) {
+      e.preventDefault();
+      if (bulletMatch[3].trim() === '') {
+        textarea.setSelectionRange(lineStart, start);
+        this.insertTextAtCursor('');
+      } else {
+        this.insertTextAtCursor('\n' + bulletMatch[1] + bulletMatch[2]);
+      }
+    } else if (numberMatch) {
+      e.preventDefault();
+      if (numberMatch[3].trim() === '') {
+        textarea.setSelectionRange(lineStart, start);
+        this.insertTextAtCursor('');
+      } else {
+        const nextNum = parseInt(numberMatch[2], 10) + 1;
+        this.insertTextAtCursor('\n' + numberMatch[1] + nextNum + '. ');
+      }
+    }
+  }
+
+  insertTextAtCursor(text, selectOffset = 0, selectLength = 0) {
+    const textarea = this.sourceTextarea;
+    textarea.focus();
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    if (document.queryCommandSupported && document.queryCommandSupported('insertText')) {
+      document.execCommand('insertText', false, text);
+    } else {
+      const val = textarea.value;
+      textarea.value = val.substring(0, start) + text + val.substring(end);
+      textarea.selectionStart = start + text.length;
+      textarea.selectionEnd = start + text.length;
+    }
+
+    if (selectLength > 0) {
+      textarea.selectionStart = start + selectOffset;
+      textarea.selectionEnd = start + selectOffset + selectLength;
+    } else if (selectOffset > 0) {
+      textarea.selectionStart = start + selectOffset;
+      textarea.selectionEnd = start + selectOffset;
+    }
+
+    this.handleEditorInput();
+  }
+
+  formatWrap(before, after, defaultText = 'texto') {
+    const textarea = this.sourceTextarea;
+    textarea.focus();
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const val = textarea.value;
+    const selectedText = val.substring(start, end);
+
+    if (selectedText.length > 0) {
+      if (
+        val.substring(start - before.length, start) === before &&
+        val.substring(end, end + after.length) === after
+      ) {
+        textarea.selectionStart = start - before.length;
+        textarea.selectionEnd = end + after.length;
+        this.insertTextAtCursor(selectedText, 0, selectedText.length);
+        return;
+      }
+      const replacement = `${before}${selectedText}${after}`;
+      this.insertTextAtCursor(replacement, before.length, selectedText.length);
+    } else {
+      const replacement = `${before}${defaultText}${after}`;
+      this.insertTextAtCursor(replacement, before.length, defaultText.length);
+    }
+  }
+
+  formatHeading() {
+    const textarea = this.sourceTextarea;
+    textarea.focus();
+    const start = textarea.selectionStart;
+    const val = textarea.value;
+
+    const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+    const lineEnd = val.indexOf('\n', start);
+    const currentLine = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);
+
+    let newLine = '';
+    if (currentLine.startsWith('### ')) {
+      newLine = currentLine.substring(4);
+    } else if (currentLine.startsWith('## ')) {
+      newLine = '### ' + currentLine.substring(3);
+    } else if (currentLine.startsWith('# ')) {
+      newLine = '## ' + currentLine.substring(2);
+    } else {
+      newLine = '# ' + currentLine.replace(/^#+\s*/, '');
+    }
+
+    textarea.setSelectionRange(lineStart, lineEnd === -1 ? val.length : lineEnd);
+    this.insertTextAtCursor(newLine);
+  }
+
+  formatPrefix(prefix) {
+    const textarea = this.sourceTextarea;
+    textarea.focus();
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const val = textarea.value;
+
+    const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+    const lineEnd = val.indexOf('\n', end);
+    const block = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);
+    const lines = block.split('\n');
+
+    const allHavePrefix = lines.every(l => l.startsWith(prefix));
+    const newLines = lines.map((l, i) => {
+      if (allHavePrefix) {
+        return l.substring(prefix.length);
+      } else {
+        if (prefix === '1. ') {
+          return `${i + 1}. ${l.replace(/^(\d+\. |- |\* |\+ |- \[[ xX]\] )\s*/, '')}`;
+        }
+        return `${prefix}${l.replace(/^(\d+\. |- |\* |\+ |- \[[ xX]\] )\s*/, '')}`;
+      }
+    });
+
+    textarea.setSelectionRange(lineStart, lineEnd === -1 ? val.length : lineEnd);
+    this.insertTextAtCursor(newLines.join('\n'));
+  }
+
+  formatLink() {
+    const textarea = this.sourceTextarea;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value.substring(start, end) || 'texto do link';
+    this.insertTextAtCursor(`[${text}](https://exemplo.com)`, text.length + 3, 19);
+  }
+
+  formatImage() {
+    const textarea = this.sourceTextarea;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value.substring(start, end) || 'legenda';
+    this.insertTextAtCursor(`![${text}](caminho/para/imagem.png)`, text.length + 4, 22);
+  }
+
+  formatCodeBlock() {
+    const textarea = this.sourceTextarea;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value.substring(start, end) || '// código aqui';
+    const snippet = `\`\`\`javascript\n${text}\n\`\`\`\n`;
+    this.insertTextAtCursor(snippet, 3, 10);
+  }
+
+  formatTable() {
+    const snippet = `| Coluna 1 | Coluna 2 | Coluna 3 |\n| :--- | :--- | :--- |\n| Item 1 | Valor A | 100 |\n| Item 2 | Valor B | 200 |\n`;
+    this.insertTextAtCursor(snippet);
+  }
+
+  toggleTaskCheckbox(taskIndex, isChecked) {
+    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    if (!activeTab) return;
+
+    let currentIndex = 0;
+    const regex = /^(\s*[-*+]\s+\[)([ xX])(\]\s+.*)$/gm;
+    activeTab.content = activeTab.content.replace(regex, (match, prefix, checkState, suffix) => {
+      if (currentIndex === taskIndex) {
+        currentIndex++;
+        return `${prefix}${isChecked ? 'x' : ' '}${suffix}`;
+      }
+      currentIndex++;
+      return match;
+    });
+
+    this.sourceTextarea.value = activeTab.content;
+    const isDirty = activeTab.content !== activeTab.savedContent;
+    this.updateTabDirty(activeTab, isDirty);
   }
 
   async openSampleDocument() {
@@ -603,14 +1082,23 @@ class MDViewerApp {
         a.addEventListener('click', (e) => {
           e.preventDefault();
           const localTarget = a.dataset.localPath;
-          let fullTarget = localTarget.startsWith('/') ? localTarget : `${tab.dirName}/${localTarget}`;
-          // clean hash anchor if present
+          let fullTarget = (localTarget.startsWith('/') || !tab.dirName) ? localTarget : `${tab.dirName}/${localTarget}`;
           if (fullTarget.includes('#')) {
             fullTarget = fullTarget.split('#')[0];
           }
           this.openFile(fullTarget);
         });
       }
+    });
+
+    // Setup interactive task checkboxes in preview
+    const taskCheckboxes = this.markdownContainer.querySelectorAll('.task-list-item input[type="checkbox"]');
+    taskCheckboxes.forEach((chk, index) => {
+      chk.removeAttribute('disabled');
+      chk.style.cursor = 'pointer';
+      chk.addEventListener('change', () => {
+        this.toggleTaskCheckbox(index, chk.checked);
+      });
     });
 
     // Render Mermaid diagrams

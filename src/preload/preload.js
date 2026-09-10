@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Files
   readFile: (filePath) => ipcRenderer.invoke('file:read', filePath),
+  saveFile: (filePath, content) => ipcRenderer.invoke('file:save', { filePath, content }),
+  saveFileAs: (content, defaultName, defaultDir) => ipcRenderer.invoke('file:save-as', { content, defaultName, defaultDir }),
+  confirmUnsaved: (fileName) => ipcRenderer.invoke('dialog:confirm-unsaved', fileName),
   readDir: (dirPath) => ipcRenderer.invoke('file:read-dir', dirPath),
   watchFile: (filePath) => ipcRenderer.invoke('file:watch', filePath),
   unwatchFile: (filePath) => ipcRenderer.invoke('file:unwatch', filePath),

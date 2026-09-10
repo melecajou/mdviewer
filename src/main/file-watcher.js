@@ -6,6 +6,16 @@ class FileWatcherManager {
     this.notifyCallback = notifyCallback;
     this.watchers = new Map(); // filePath -> FSWatcher
     this.debounceTimers = new Map();
+    this.ignoredPaths = new Set();
+  }
+
+  ignoreNext(filePath) {
+    if (!filePath) return;
+    const resolvedPath = path.resolve(filePath);
+    this.ignoredPaths.add(resolvedPath);
+    setTimeout(() => {
+      this.ignoredPaths.delete(resolvedPath);
+    }, 2000);
   }
 
   watch(filePath) {
@@ -27,6 +37,11 @@ class FileWatcherManager {
       });
 
       const handleEvent = (event) => {
+        if (this.ignoredPaths.has(resolvedPath)) {
+          this.ignoredPaths.delete(resolvedPath);
+          return;
+        }
+
         if (this.debounceTimers.has(resolvedPath)) {
           clearTimeout(this.debounceTimers.get(resolvedPath));
         }
