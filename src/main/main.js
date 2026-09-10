@@ -107,6 +107,7 @@ if (!gotTheLock) {
 }
 
 function createWindow() {
+  const savedBounds = store.get('windowBounds') || {};
   const isWin = process.platform === 'win32';
   const icoPath = path.join(__dirname, '../assets/icon.ico');
   const pngPath = path.join(__dirname, '../assets/icon.png');
