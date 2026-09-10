@@ -1,8 +1,13 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const Store = require('./store');
 const FileWatcherManager = require('./file-watcher');
+
+app.setName('MDViewer');
+if (process.platform === 'linux' && typeof app.setDesktopName === 'function') {
+  app.setDesktopName('mdviewer.desktop');
+}
 
 let mainWindow = null;
 const store = new Store();
@@ -105,7 +110,8 @@ function createWindow() {
   const isWin = process.platform === 'win32';
   const icoPath = path.join(__dirname, '../assets/icon.ico');
   const pngPath = path.join(__dirname, '../assets/icon.png');
-  const iconPath = (isWin && fs.existsSync(icoPath)) ? icoPath : (fs.existsSync(pngPath) ? pngPath : undefined);
+  const iconImg = fs.existsSync(pngPath) ? nativeImage.createFromPath(pngPath) : undefined;
+  const iconPath = (isWin && fs.existsSync(icoPath)) ? icoPath : (iconImg || pngPath);
 
   mainWindow = new BrowserWindow({
     width: savedBounds.width || 1200,
@@ -124,6 +130,10 @@ function createWindow() {
       sandbox: false
     }
   });
+
+  if (iconImg && process.platform === 'linux') {
+    mainWindow.setIcon(iconImg);
+  }
 
   // Init watcher
   watcherManager = new FileWatcherManager((event, filePath) => {
