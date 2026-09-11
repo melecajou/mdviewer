@@ -90,7 +90,7 @@ describe('Store', () => {
       const store = new Store();
 
       expect(store.data).toEqual(store.defaults);
-      expect(consoleErrorSpy).toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading settings:', expect.any(Error));
 
       consoleErrorSpy.mockRestore();
     });
@@ -105,7 +105,22 @@ describe('Store', () => {
       const store = new Store();
 
       expect(store.data).toEqual(store.defaults);
-      expect(consoleErrorSpy).toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading settings:', expect.any(SyntaxError));
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should fallback to defaults and handle JSON parse error on empty string', () => {
+      fs.existsSync.mockReturnValue(true);
+      fs.readFileSync.mockReturnValue(''); // Empty string will throw SyntaxError in JSON.parse
+
+      // Suppress console.error for this test
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      const store = new Store();
+
+      expect(store.data).toEqual(store.defaults);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading settings:', expect.any(SyntaxError));
 
       consoleErrorSpy.mockRestore();
     });
