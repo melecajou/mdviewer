@@ -45,6 +45,9 @@ let mermaidContent = fs.readFileSync(mermaidSrc, 'utf8');
 mermaidContent = mermaidContent.replace(/\uFFFF/g, '\\uFFFF');
 fs.writeFileSync(mermaidDest, mermaidContent, 'utf8');
 
+console.log('🛡️  Copiando DOMPurify...');
+fs.copyFileSync(path.join(ROOT_DIR, 'node_modules/dompurify/dist/purify.min.js'), path.join(DIST_DIR, 'lib/purify.min.js'));
+
 // 4. Copiar KaTeX CSS e Fontes
 console.log('🧮 Copiando estilos e fontes KaTeX...');
 const katexCssSrc = path.join(ROOT_DIR, 'node_modules/katex/dist/katex.min.css');

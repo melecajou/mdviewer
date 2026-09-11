@@ -1020,9 +1020,22 @@ class MDViewerApp {
   renderMarkdown(tab) {
     const parsed = window.electronAPI.parseMarkdown(tab.content);
     
-    // Inject HTML
-    this.markdownContainer.innerHTML = parsed.html;
+    // Inject HTML (Sanitized to prevent XSS)
+    const sanitizedHtml = DOMPurify.sanitize(parsed.html, {
+      ADD_TAGS: ['svg', 'path', 'figure', 'figcaption'],
+      ADD_ATTR: ['data-code', 'data-line', 'data-local-path', 'viewBox', 'fill', 'd']
+    });
+    this.markdownContainer.innerHTML = sanitizedHtml;
     this.headings = parsed.headings || [];
+
+    // Attach heading anchor copy link
+    const headingAnchors = this.markdownContainer.querySelectorAll('.heading-anchor');
+    headingAnchors.forEach(anchor => {
+      anchor.addEventListener('click', () => {
+        const id = anchor.parentElement.id;
+        navigator.clipboard.writeText(window.location.origin + window.location.pathname + '#' + id);
+      });
+    });
 
     // Update Status Bar
     if (parsed.stats) {
