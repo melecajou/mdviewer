@@ -84,7 +84,7 @@ class Store {
         if (fs.existsSync(dir)) {
           return fs.statSync(dir).isDirectory();
         }
-      } catch (e) {}
+      } catch {}
       return false;
     };
 
@@ -96,7 +96,7 @@ class Store {
       try {
         const parent = path.dirname(preferredPath);
         if (isValidDir(parent)) return parent;
-      } catch (e) {}
+      } catch {}
     }
 
     // 2. Stored lastDirectory
@@ -115,7 +115,7 @@ class Store {
       try {
         const dir = path.dirname(f);
         if (isValidDir(dir)) return dir;
-      } catch (e) {}
+      } catch {}
     }
 
     // 5. Most recent folders
@@ -128,12 +128,12 @@ class Store {
     try {
       const docs = app.getPath('documents');
       if (isValidDir(docs)) return docs;
-    } catch (e) {}
+    } catch {}
 
     try {
       const home = app.getPath('home');
       if (isValidDir(home)) return home;
-    } catch (e) {}
+    } catch {}
 
     return undefined;
   }
