@@ -51,7 +51,7 @@ function processMath(markdown) {
       const placeholder = `%%MATH_BLOCK_${mathBlocks.length}%%`;
       mathBlocks.push(`<div class="katex-block">${rendered}</div>`);
       return placeholder;
-    } catch (e) {
+    } catch {
       return match;
     }
   });
@@ -70,7 +70,7 @@ function processMath(markdown) {
       const placeholder = `%%MATH_INLINE_${mathInlines.length}%%`;
       mathInlines.push(`${prefix}<span class="katex-inline">${rendered}</span>`);
       return placeholder;
-    } catch (e) {
+    } catch {
       return match;
     }
   });
