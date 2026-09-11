@@ -506,33 +506,34 @@ ipcMain.handle('file:read-dir', async (event, dirPath) => {
     async function scanDirectory(dir, depth = 0) {
       if (depth > 5) return []; // Limit recursion depth
       const entries = await fs.promises.readdir(dir, { withFileTypes: true });
-      const items = [];
 
-      for (const entry of entries) {
+      const promises = entries.map(async (entry) => {
         if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === '__pycache__' || entry.name === 'target' || entry.name === 'dist') {
-          continue;
+          return null;
         }
         const fullPath = path.join(dir, entry.name);
         if (entry.isDirectory()) {
           const children = await scanDirectory(fullPath, depth + 1);
-          items.push({
+          return {
             name: entry.name,
             path: fullPath,
             isDirectory: true,
             children
-          });
+          };
         } else {
           const ext = path.extname(entry.name).toLowerCase();
           const isMd = ['.md', '.markdown', '.mdown', '.mkd', '.mdx', '.txt'].includes(ext);
-          items.push({
+          return {
             name: entry.name,
             path: fullPath,
             isDirectory: false,
             extension: ext,
             isMarkdown: isMd
-          });
+          };
         }
-      }
+      });
+
+      const items = (await Promise.all(promises)).filter(Boolean);
 
       // Sort: folders first, then markdown files, then others
       return items.sort((a, b) => {
