@@ -271,7 +271,7 @@ class MDViewerApp extends MDViewerBase {
       e.stopPropagation();
       this.welcomeDropzone.classList.remove('drag-over');
     });
-    window.addEventListener('drop', (e) => {
+    window.addEventListener('drop', async (e) => {
       e.preventDefault();
       e.stopPropagation();
       this.welcomeDropzone.classList.remove('drag-over');
@@ -279,6 +279,9 @@ class MDViewerApp extends MDViewerBase {
         for (let i = 0; i < e.dataTransfer.files.length; i++) {
           const file = e.dataTransfer.files[i];
           if (file.path) {
+            if (window.electronAPI && window.electronAPI.allowDroppedPath) {
+              await window.electronAPI.allowDroppedPath(file.path);
+            }
             this.openFile(file.path);
           }
         }

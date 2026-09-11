@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showInFolder: (filePath) => ipcRenderer.invoke('shell:show-in-folder', filePath),
   getSamplePath: () => ipcRenderer.invoke('app:get-sample-path'),
   getInitialTargets: () => ipcRenderer.invoke('app:get-initial-targets'),
+  allowDroppedPath: (filePath) => ipcRenderer.invoke('app:allow-dropped-path', filePath),
 
   // Events from Main Process
   onCliOpenTargets: (callback) => {

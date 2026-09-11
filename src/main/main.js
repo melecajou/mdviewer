@@ -178,7 +178,7 @@ function createWindow() {
       preload: path.join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: false
     }
   });
 
@@ -407,6 +407,7 @@ ipcMain.handle('dialog:open-file', async (event, preferredPath) => {
   if (!result.canceled && result.filePaths.length > 0) {
     const selected = result.filePaths[0];
     addAllowedPath(selected);
+    addAllowedPath(path.dirname(selected));
     store.setLastDirectory(path.dirname(selected));
     return selected;
   }
@@ -731,6 +732,16 @@ ipcMain.handle('app:get-initial-targets', () => {
   const targets = [...pendingTargets];
   pendingTargets = [];
   return targets;
+});
+
+// Allow user dropped path
+ipcMain.handle('app:allow-dropped-path', (event, targetPath) => {
+  if (targetPath && typeof targetPath === 'string' && fs.existsSync(targetPath)) {
+    addAllowedPath(targetPath);
+    addAllowedPath(path.dirname(targetPath));
+    return true;
+  }
+  return false;
 });
 
 // App Quit

@@ -28,7 +28,9 @@ class Store {
     try {
       await fs.promises.access(this.filePath);
       const content = await fs.promises.readFile(this.filePath, 'utf-8');
-      this.data = { ...this.defaults, ...JSON.parse(content) };
+      if (content && content.trim()) {
+        this.data = { ...this.defaults, ...JSON.parse(content) };
+      }
     } catch (err) {
       if (err.code !== 'ENOENT') {
         console.error('Error loading settings:', err);
