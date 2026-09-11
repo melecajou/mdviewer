@@ -89,6 +89,36 @@ function processMath(markdown) {
   };
 }
 
+/**
+ * Splits highlighted HTML into lines while keeping syntax highlighting
+ * span tags balanced and properly carried over across line breaks.
+ */
+function splitHighlightedLines(html) {
+  if (!html) return [''];
+  const lines = html.split('\n');
+  const result = [];
+  const openTags = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const prefix = openTags.map(cls => `<span class="${cls}">`).join('');
+
+    const tagRegex = /<(\/)?span(?: class="([^"]*)")?>/g;
+    let match;
+    while ((match = tagRegex.exec(line)) !== null) {
+      if (match[1] === '/') {
+        openTags.pop();
+      } else {
+        openTags.push(match[2] || '');
+      }
+    }
+
+    const suffix = openTags.map(() => '</span>').join('');
+    result.push(prefix + line + suffix);
+  }
+  return result;
+}
+
 function parseMarkdown(rawContent, options = {}) {
   const headings = [];
   const slugCounts = {};
@@ -191,14 +221,9 @@ function parseMarkdown(rawContent, options = {}) {
       highlighted = '';
     }
 
-    // Add line numbers
-    const lines = highlighted.split('\n');
-    const numberedLines = lines.map((line, idx) => `
-      <div class="code-line">
-        <span class="line-number" data-line="${idx + 1}"></span>
-        <span class="line-content">${line}</span>
-      </div>
-    `).join('');
+    // Add line numbers safely preserving syntax spans across lines without extra whitespace
+    const lines = splitHighlightedLines(highlighted);
+    const numberedLines = lines.map((line, idx) => `<div class="code-line"><span class="line-number" data-line="${idx + 1}"></span><span class="line-content">${line}</span></div>`).join('');
 
     const escapedRawCode = encodeURIComponent(code);
 

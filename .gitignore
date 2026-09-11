@@ -9,6 +9,7 @@ build/
 
 # User screenshots and test media
 Captura de tela*.png
+realce_sintace.png
 *.png.tmp
 
 # Logs
