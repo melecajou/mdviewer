@@ -120,7 +120,7 @@ class MDViewerApp {
       window.mermaid.initialize({
         startOnLoad: false,
         theme: isDark ? 'dark' : 'default',
-        securityLevel: 'loose',
+        securityLevel: 'strict',
         flowchart: { htmlLabels: true, curve: 'basis' }
       });
     }
