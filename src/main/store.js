@@ -21,19 +21,19 @@ class Store {
       lineNumbers: true,
       windowBounds: { width: 1200, height: 800, x: undefined, y: undefined }
     };
-    this.data = this.load();
+    this.data = { ...this.defaults };
   }
 
-  load() {
+  async init() {
     try {
-      if (fs.existsSync(this.filePath)) {
-        const content = fs.readFileSync(this.filePath, 'utf-8');
-        return { ...this.defaults, ...JSON.parse(content) };
-      }
+      await fs.promises.access(this.filePath);
+      const content = await fs.promises.readFile(this.filePath, 'utf-8');
+      this.data = { ...this.defaults, ...JSON.parse(content) };
     } catch (err) {
-      console.error('Error loading settings:', err);
+      if (err.code !== 'ENOENT') {
+        console.error('Error loading settings:', err);
+      }
     }
-    return { ...this.defaults };
   }
 
   save() {

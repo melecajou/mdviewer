@@ -95,7 +95,8 @@ if (!gotTheLock) {
     }
   });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    await store.init();
     createWindow();
 
     app.on('activate', () => {

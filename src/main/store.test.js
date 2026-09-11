@@ -3,7 +3,17 @@ const path = require('path');
 const Store = require('./store');
 
 // Mock dependencies
-jest.mock('fs');
+jest.mock('fs', () => ({
+  existsSync: jest.fn(),
+  readFileSync: jest.fn(),
+  mkdirSync: jest.fn(),
+  writeFileSync: jest.fn(),
+  statSync: jest.fn(),
+  promises: {
+    access: jest.fn(),
+    readFile: jest.fn()
+  }
+}));
 jest.mock('electron', () => ({
   app: {
     getPath: jest.fn((name) => {
@@ -22,11 +32,14 @@ describe('Store', () => {
   });
 
   describe('Initialization', () => {
-    it('should initialize with default paths and values', () => {
+    it('should initialize with default paths and values', async () => {
       // Setup mock to simulate missing settings file
-      fs.existsSync.mockReturnValue(false);
+      const error = new Error('ENOENT');
+      error.code = 'ENOENT';
+      fs.promises.access.mockRejectedValue(error);
 
       const store = new Store();
+      await store.init();
 
       expect(store.userDataPath).toBe('/mock/user/data/path');
       expect(store.filePath).toBe(path.join('/mock/user/data/path', 'mdviewer-settings.json'));
@@ -51,20 +64,21 @@ describe('Store', () => {
       expect(store.data).toEqual(defaultSettings);
 
       // Should not try to read since it doesn't exist
-      expect(fs.readFileSync).not.toHaveBeenCalled();
+      expect(fs.promises.readFile).not.toHaveBeenCalled();
     });
 
-    it('should load settings from file if it exists and merge with defaults', () => {
+    it('should load settings from file if it exists and merge with defaults', async () => {
       const existingSettings = {
         theme: 'light',
         fontSize: 18,
         sidebarVisible: false
       };
 
-      fs.existsSync.mockReturnValue(true);
-      fs.readFileSync.mockReturnValue(JSON.stringify(existingSettings));
+      fs.promises.access.mockResolvedValue(undefined);
+      fs.promises.readFile.mockResolvedValue(JSON.stringify(existingSettings));
 
       const store = new Store();
+      await store.init();
 
       // Check if it merged correctly
       expect(store.data.theme).toBe('light');
@@ -75,19 +89,18 @@ describe('Store', () => {
       expect(store.data.zoomLevel).toBe(1.0);
       expect(store.data.liveWatch).toBe(true);
 
-      expect(fs.readFileSync).toHaveBeenCalledWith(store.filePath, 'utf-8');
+      expect(fs.promises.readFile).toHaveBeenCalledWith(store.filePath, 'utf-8');
     });
 
-    it('should fallback to defaults if reading file fails', () => {
-      fs.existsSync.mockReturnValue(true);
-      fs.readFileSync.mockImplementation(() => {
-        throw new Error('Failed to read file');
-      });
+    it('should fallback to defaults if reading file fails', async () => {
+      fs.promises.access.mockResolvedValue(undefined);
+      fs.promises.readFile.mockRejectedValue(new Error('Failed to read file'));
 
       // Suppress console.error for this test
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
       const store = new Store();
+      await store.init();
 
       expect(store.data).toEqual(store.defaults);
       expect(consoleErrorSpy).toHaveBeenCalled();
@@ -95,14 +108,15 @@ describe('Store', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it('should fallback to defaults if JSON is invalid', () => {
-      fs.existsSync.mockReturnValue(true);
-      fs.readFileSync.mockReturnValue('{ invalid json }');
+    it('should fallback to defaults if JSON is invalid', async () => {
+      fs.promises.access.mockResolvedValue(undefined);
+      fs.promises.readFile.mockResolvedValue('{ invalid json }');
 
       // Suppress console.error for this test
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
       const store = new Store();
+      await store.init();
 
       expect(store.data).toEqual(store.defaults);
       expect(consoleErrorSpy).toHaveBeenCalled();
