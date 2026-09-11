@@ -467,22 +467,24 @@ class MDViewerExtensionApp {
         async function scanDirectoryHandle(handle, currentRelPath = '', depth = 0) {
           if (depth > 12) return [];
           const entries = [];
+          const dirPromises = [];
           for await (const entry of handle.values()) {
             if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === '__pycache__' || entry.name === 'dist' || entry.name === 'build' || entry.name === '.git') {
               continue;
             }
             const relPath = currentRelPath ? `${currentRelPath}/${entry.name}` : entry.name;
             if (entry.kind === 'directory') {
-              const children = await scanDirectoryHandle(entry, relPath, depth + 1);
-              if (children.length > 0) {
-                entries.push({
-                  name: entry.name,
-                  path: relPath,
-                  relPath: relPath,
-                  isDirectory: true,
-                  children: children
-                });
-              }
+              dirPromises.push(scanDirectoryHandle(entry, relPath, depth + 1).then(children => {
+                if (children.length > 0) {
+                  entries.push({
+                    name: entry.name,
+                    path: relPath,
+                    relPath: relPath,
+                    isDirectory: true,
+                    children: children
+                  });
+                }
+              }));
             } else if (entry.kind === 'file') {
               const lower = entry.name.toLowerCase();
               if (lower.endsWith('.md') || lower.endsWith('.markdown') || lower.endsWith('.mdown') || lower.endsWith('.txt')) {
@@ -497,6 +499,8 @@ class MDViewerExtensionApp {
               }
             }
           }
+
+          await Promise.all(dirPromises);
 
           // Ordenar: pastas primeiro, depois arquivos alfabeticamente com ordenação numérica natural (ex: 01, 02... 10)
           return entries.sort((a, b) => {
