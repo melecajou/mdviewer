@@ -13,6 +13,34 @@ let mainWindow = null;
 const store = new Store();
 let watcherManager = null;
 
+const allowedPaths = new Set();
+
+function addAllowedPath(p) {
+  if (!p || typeof p !== 'string') return;
+  try {
+    allowedPaths.add(path.resolve(p));
+  } catch (e) {
+    console.error('Error resolving path to allow:', e);
+  }
+}
+
+function isPathAllowed(p) {
+  if (!p || typeof p !== 'string') return false;
+  try {
+    const target = path.resolve(p);
+    for (const allowed of allowedPaths) {
+      if (target === allowed) return true;
+      const rel = path.relative(allowed, target);
+      if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
+        return true;
+      }
+    }
+  } catch (e) {
+    console.error('Error validating path:', e);
+  }
+  return false;
+}
+
 // Parse file/folder paths from command line arguments
 function parseCommandLineArgs(argv, cwd = process.cwd()) {
   const targets = [];
@@ -83,6 +111,7 @@ if (!gotTheLock) {
 } else {
   app.on('second-instance', (event, commandLine, workingDirectory) => {
     const targets = parseCommandLineArgs(commandLine, workingDirectory);
+    targets.forEach(t => addAllowedPath(t));
     if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
@@ -96,6 +125,23 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
+    // Initialize Allowed Paths from store and other known locations
+    const allSettings = store.getAll();
+    if (allSettings.recentFiles) {
+      allSettings.recentFiles.forEach(f => addAllowedPath(f));
+    }
+    if (allSettings.recentFolders) {
+      allSettings.recentFolders.forEach(f => addAllowedPath(f));
+    }
+    if (allSettings.lastOpenedFolder) {
+      addAllowedPath(allSettings.lastOpenedFolder);
+    }
+    if (allSettings.lastDirectory) {
+      addAllowedPath(allSettings.lastDirectory);
+    }
+    addAllowedPath(path.join(__dirname, '../../sample.md'));
+    pendingTargets.forEach(t => addAllowedPath(t));
+
     createWindow();
 
     app.on('activate', () => {
@@ -356,6 +402,7 @@ ipcMain.handle('dialog:open-file', async (event, preferredPath) => {
   const result = await dialog.showOpenDialog(mainWindow, options);
   if (!result.canceled && result.filePaths.length > 0) {
     const selected = result.filePaths[0];
+    addAllowedPath(selected);
     store.setLastDirectory(path.dirname(selected));
     return selected;
   }
@@ -375,6 +422,7 @@ ipcMain.handle('dialog:open-folder', async (event, preferredPath) => {
   const result = await dialog.showOpenDialog(mainWindow, options);
   if (!result.canceled && result.filePaths.length > 0) {
     const selected = result.filePaths[0];
+    addAllowedPath(selected);
     store.setLastDirectory(selected);
     store.set('lastOpenedFolder', selected);
     return selected;
@@ -385,6 +433,13 @@ ipcMain.handle('dialog:open-folder', async (event, preferredPath) => {
 // File: Read Content
 ipcMain.handle('file:read', async (event, filePath) => {
   try {
+    if (!isPathAllowed(filePath)) {
+      return {
+        success: false,
+        error: 'Access denied: Path is not allowed.',
+        filePath
+      };
+    }
     const resolvedPath = path.resolve(filePath);
     const content = await fs.promises.readFile(resolvedPath, 'utf-8');
     const stats = await fs.promises.stat(resolvedPath);
@@ -413,6 +468,9 @@ ipcMain.handle('file:save', async (event, { filePath, content }) => {
   try {
     if (!filePath) {
       return { success: false, error: 'Caminho do arquivo não fornecido.' };
+    }
+    if (!isPathAllowed(filePath)) {
+      return { success: false, error: 'Access denied: Path is not allowed.' };
     }
     const resolvedPath = path.resolve(filePath);
     if (watcherManager) {
@@ -453,6 +511,7 @@ ipcMain.handle('file:save-as', async (event, { content, defaultName, defaultDir 
 
     if (!result.canceled && result.filePath) {
       const resolvedPath = path.resolve(result.filePath);
+      addAllowedPath(resolvedPath);
       if (watcherManager) {
         watcherManager.ignoreNext(resolvedPath);
         watcherManager.watch(resolvedPath);
@@ -498,6 +557,9 @@ ipcMain.handle('dialog:confirm-unsaved', async (event, fileName) => {
 // File: Read Directory Tree
 ipcMain.handle('file:read-dir', async (event, dirPath) => {
   try {
+    if (!isPathAllowed(dirPath)) {
+      return { success: false, error: 'Access denied: Path is not allowed.' };
+    }
     const resolvedDir = path.resolve(dirPath);
     store.addRecentFolder(resolvedDir);
     store.set('lastOpenedFolder', resolvedDir);
@@ -559,7 +621,7 @@ ipcMain.handle('file:read-dir', async (event, dirPath) => {
 
 // File: Watch / Unwatch
 ipcMain.handle('file:watch', (event, filePath) => {
-  if (watcherManager) {
+  if (watcherManager && isPathAllowed(filePath)) {
     watcherManager.watch(filePath);
   }
   return true;
