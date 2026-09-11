@@ -266,7 +266,7 @@
             render(rawText);
           }
         }
-      } catch (e) {
+      } catch {
         // Ignora erros de permissão ou CORS
       }
     });
