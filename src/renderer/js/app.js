@@ -25,6 +25,7 @@ class MDViewerApp {
     this.bindEvents();
     this.initMermaid();
     await this.loadSettings();
+    this.updateTabsVisibility();
     await this.handleInitialTargets();
   }
 
@@ -80,6 +81,7 @@ class MDViewerApp {
 
     // Content & Tabs
     this.appContentWrapper = document.getElementById('app-content-wrapper');
+    this.viewportContainer = document.getElementById('viewport-container');
     this.tabsBar = document.getElementById('tabs-bar');
     this.btnTabAdd = document.getElementById('btn-tab-add');
     this.welcomeScreen = document.getElementById('welcome-screen');
@@ -536,8 +538,8 @@ class MDViewerApp {
     const targetTabEl = document.getElementById(`tab-el-${targetTab.id}`);
     if (targetTabEl) targetTabEl.classList.add('active');
 
-    // Hide welcome screen
-    this.welcomeScreen.style.display = 'none';
+    // Update tabs visibility
+    this.updateTabsVisibility();
 
     // Update Source Textarea
     this.sourceTextarea.value = targetTab.content;
@@ -585,22 +587,20 @@ class MDViewerApp {
 
     this.tabs.splice(tabIdx, 1);
 
-    if (this.activeTabId === tabId) {
-      if (this.tabs.length > 0) {
-        const nextTab = this.tabs[Math.max(0, tabIdx - 1)];
-        this.switchTab(nextTab.id);
-      } else {
-        this.activeTabId = null;
-        this.welcomeScreen.style.display = 'flex';
-        this.markdownContainer.innerHTML = '';
-        this.sourceTextarea.value = '';
-        this.tocContainer.innerHTML = '<p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-top: 20px;">Nenhum cabeçalho encontrado.</p>';
-        this.statusFilePath.textContent = 'Nenhum arquivo';
-        this.statusStats.textContent = '0 palavras • 0 linhas';
-        this.statusReadTime.textContent = '1 min de leitura';
-        document.title = 'MDViewer';
-        this.updateActiveTreeItem(null);
-      }
+    if (this.tabs.length === 0) {
+      this.activeTabId = null;
+      this.updateTabsVisibility();
+      this.markdownContainer.innerHTML = '';
+      this.sourceTextarea.value = '';
+      this.tocContainer.innerHTML = '<p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-top: 20px;">Nenhum cabeçalho encontrado.</p>';
+      this.statusFilePath.textContent = 'Nenhum arquivo';
+      this.statusStats.textContent = '0 palavras • 0 linhas';
+      this.statusReadTime.textContent = '1 min de leitura';
+      document.title = 'MDViewer';
+      this.updateActiveTreeItem(null);
+    } else if (this.activeTabId === tabId) {
+      const nextTab = this.tabs[Math.max(0, tabIdx - 1)];
+      this.switchTab(nextTab.id);
     }
   }
 
@@ -1474,13 +1474,43 @@ class MDViewerApp {
 
   setViewMode(mode) {
     this.viewMode = mode;
-    this.appContentWrapper.className = `app-content mode-${mode}`;
+    this.appContentWrapper.classList.remove('mode-preview', 'mode-split', 'mode-source');
+    this.appContentWrapper.classList.add(`mode-${mode}`);
     
     this.btnViewPreview.classList.toggle('active', mode === 'preview');
     this.btnViewSplit.classList.toggle('active', mode === 'split');
     this.btnViewSource.classList.toggle('active', mode === 'source');
     
+    this.updateTabsVisibility();
     this.saveSettings();
+  }
+
+  updateTabsVisibility() {
+    const hasTabs = Boolean(this.tabs && this.tabs.length > 0);
+    if (this.viewportContainer) {
+      this.viewportContainer.classList.toggle('has-tabs', hasTabs);
+    }
+    if (this.appContentWrapper) {
+      this.appContentWrapper.classList.toggle('has-tabs', hasTabs);
+    }
+
+    if (!hasTabs) {
+      if (this.welcomeScreen) this.welcomeScreen.style.display = 'flex';
+      if (this.sourcePane) this.sourcePane.style.display = 'none';
+      if (this.previewPane) this.previewPane.style.display = 'none';
+    } else {
+      if (this.welcomeScreen) this.welcomeScreen.style.display = 'none';
+      if (this.viewMode === 'preview') {
+        if (this.previewPane) this.previewPane.style.display = 'block';
+        if (this.sourcePane) this.sourcePane.style.display = 'none';
+      } else if (this.viewMode === 'source') {
+        if (this.previewPane) this.previewPane.style.display = 'none';
+        if (this.sourcePane) this.sourcePane.style.display = 'flex';
+      } else { // split
+        if (this.previewPane) this.previewPane.style.display = 'block';
+        if (this.sourcePane) this.sourcePane.style.display = 'flex';
+      }
+    }
   }
 
   toggleSidebar(forceState = null) {

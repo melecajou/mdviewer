@@ -14,6 +14,17 @@ html, body {
   display: none !important;
 }
 
+.viewport-container:not(.has-tabs) .source-pane,
+.viewport-container:not(.has-tabs) .preview-pane {
+  display: none !important;
+}
+
+.viewport-container:not(.has-tabs) .welcome-screen {
+  display: flex !important;
+  flex: 1;
+  width: 100%;
+}
+
 .viewport-container.has-tabs .welcome-screen,
 .welcome-screen.hidden {
   display: none !important;
