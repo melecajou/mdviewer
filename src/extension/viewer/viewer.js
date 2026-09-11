@@ -122,7 +122,7 @@ class MDViewerExtensionApp {
       window.mermaid.initialize({
         startOnLoad: false,
         theme: isDark ? 'dark' : 'default',
-        securityLevel: 'loose',
+        securityLevel: 'strict',
         flowchart: { htmlLabels: true, curve: 'basis' }
       });
     }
@@ -1470,7 +1470,7 @@ class MDViewerExtensionApp {
         window.mermaid.initialize({
           startOnLoad: false,
           theme: isDark ? 'dark' : 'default',
-          securityLevel: 'loose'
+          securityLevel: 'strict'
         });
         window.mermaid.run({
           nodes: this.markdownContainer.querySelectorAll('.mermaid')
