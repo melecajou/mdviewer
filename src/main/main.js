@@ -124,7 +124,9 @@ if (!gotTheLock) {
     }
   });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    await store.init();
+
     // Initialize Allowed Paths from store and other known locations
     const allSettings = store.getAll();
     if (allSettings.recentFiles) {
