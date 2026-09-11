@@ -75,6 +75,7 @@ fs.copyFileSync(path.join(EXT_SRC, 'background.js'), path.join(DIST_DIR, 'backgr
 fs.cpSync(path.join(EXT_SRC, 'popup'), path.join(DIST_DIR, 'popup'), { recursive: true });
 fs.cpSync(path.join(EXT_SRC, 'content'), path.join(DIST_DIR, 'content'), { recursive: true });
 fs.cpSync(path.join(EXT_SRC, 'viewer'), path.join(DIST_DIR, 'viewer'), { recursive: true });
+fs.cpSync(path.join(ROOT_DIR, 'src/shared'), path.join(DIST_DIR, 'shared'), { recursive: true });
 
 // 8. Opcional: Gerar arquivo ZIP para publicação / distribuição rápida
 const zipOut = path.join(ROOT_DIR, 'dist/mdviewer-chrome-extension.zip');
