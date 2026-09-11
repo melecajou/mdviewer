@@ -1373,7 +1373,7 @@ class MDViewerExtensionApp {
           this.sourceTextarea.value = tab.content;
           this.renderMarkdown(tab.content);
         }
-      } catch (e) {}
+      } catch {}
     }
   }
 
@@ -1717,7 +1717,7 @@ class MDViewerExtensionApp {
         this.openDocumentTab('Exemplo Completo.md', text, 'sample.md');
         return;
       }
-    } catch (e) {}
+    } catch {}
 
     // Fallback caso fetch falhe
     const sampleText = `# 🚀 MDViewer para Google Chrome
