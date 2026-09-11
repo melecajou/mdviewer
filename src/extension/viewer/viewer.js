@@ -437,10 +437,16 @@ class MDViewerExtensionApp {
           multiple: true
         });
 
-        for (const handle of fileHandles) {
+        const filePromises = fileHandles.map(async (handle) => {
           const file = await handle.getFile();
           const content = await file.text();
-          this.openDocumentTab(file.name, content, file.name, handle);
+          return { file, content, handle };
+        });
+
+        const filesData = await Promise.all(filePromises);
+
+        for (const data of filesData) {
+          this.openDocumentTab(data.file.name, data.content, data.file.name, data.handle);
         }
       } catch (err) {
         if (err.name !== 'AbortError') {
