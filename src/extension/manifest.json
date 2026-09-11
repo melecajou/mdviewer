@@ -40,6 +40,7 @@
         "http://*/*.md"
       ],
       "js": [
+        "lib/purify.min.js",
         "lib/engine.bundle.js",
         "lib/mermaid.min.js",
         "content/content.js"
