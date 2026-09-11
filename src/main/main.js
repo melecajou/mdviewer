@@ -49,7 +49,7 @@ function parseCommandLineArgs(argv, cwd = process.cwd()) {
         if (process.platform === 'win32') {
           arg = arg.replace(/^\/([a-zA-Z]:)/, '$1');
         }
-      } catch (e) {
+      } catch {
         arg = arg.replace(/^file:\/\//, '');
       }
     }
