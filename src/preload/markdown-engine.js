@@ -201,7 +201,7 @@ function parseMarkdown(rawContent, options = {}) {
     if (cleanLang && hljs.getLanguage(cleanLang)) {
       try {
         highlighted = hljs.highlight(code, { language: cleanLang, ignoreIllegals: true }).value;
-      } catch (err) {
+      } catch {
         highlighted = hljs.highlightAuto(code).value;
       }
     } else if (code.trim()) {
@@ -211,7 +211,7 @@ function parseMarkdown(rawContent, options = {}) {
         if (auto.language) {
           languageLabel = auto.language;
         }
-      } catch (err) {
+      } catch {
         highlighted = code
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
