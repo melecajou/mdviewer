@@ -110,4 +110,89 @@ describe('Store', () => {
       consoleErrorSpy.mockRestore();
     });
   });
+
+  describe('getLastDirectory', () => {
+    let store;
+
+    beforeEach(() => {
+      fs.existsSync.mockReturnValue(false); // Default false for initialization
+      store = new Store();
+      jest.clearAllMocks(); // Clear after init
+    });
+
+    // Helper to mock directory vs file existence
+    const mockFs = (dirs = [], files = [], throwFor = []) => {
+      fs.existsSync.mockImplementation((p) => {
+        if (throwFor.includes(p)) throw new Error('fs error');
+        return dirs.includes(p) || files.includes(p);
+      });
+      fs.statSync.mockImplementation((p) => {
+        if (throwFor.includes(p)) throw new Error('fs error');
+        if (dirs.includes(p)) return { isDirectory: () => true };
+        if (files.includes(p)) return { isDirectory: () => false };
+        throw new Error('ENOENT');
+      });
+    };
+
+    it('should return preferredPath if it is a valid directory', () => {
+      mockFs(['/valid/dir']);
+      expect(store.getLastDirectory('/valid/dir')).toBe('/valid/dir');
+    });
+
+    it('should return parent of preferredPath if preferredPath is a file', () => {
+      mockFs(['/valid'], ['/valid/file.txt']);
+      expect(store.getLastDirectory('/valid/file.txt')).toBe('/valid');
+    });
+
+    it('should fallback to lastDirectory if preferredPath is invalid', () => {
+      store.data.lastDirectory = '/last/dir';
+      mockFs(['/last/dir']);
+      expect(store.getLastDirectory('/invalid')).toBe('/last/dir');
+      expect(store.getLastDirectory()).toBe('/last/dir');
+    });
+
+    it('should fallback to lastOpenedFolder if lastDirectory is invalid', () => {
+      store.data.lastDirectory = '/invalid/last/dir';
+      store.data.lastOpenedFolder = '/last/opened';
+      mockFs(['/last/opened']);
+      expect(store.getLastDirectory()).toBe('/last/opened');
+    });
+
+    it('should fallback to valid parent of a recent file', () => {
+      store.data.recentFiles = ['/invalid/file.txt', '/recent/valid/file.txt'];
+      mockFs(['/recent/valid'], ['/recent/valid/file.txt']);
+      expect(store.getLastDirectory()).toBe('/recent/valid');
+    });
+
+    it('should fallback to valid recent folder', () => {
+      store.data.recentFolders = ['/invalid/folder', '/recent/folder'];
+      mockFs(['/recent/folder']);
+      expect(store.getLastDirectory()).toBe('/recent/folder');
+    });
+
+    it('should fallback to documents path', () => {
+      mockFs(['/mock/documents']);
+      expect(store.getLastDirectory()).toBe('/mock/documents');
+    });
+
+    it('should fallback to home path if documents is invalid', () => {
+      mockFs(['/mock/home']);
+      expect(store.getLastDirectory()).toBe('/mock/home');
+    });
+
+    it('should return undefined if all paths are invalid', () => {
+      mockFs([]);
+      expect(store.getLastDirectory()).toBeUndefined();
+    });
+
+    it('should gracefully handle exceptions during path validation', () => {
+      store.data.lastDirectory = '/error/dir';
+      store.data.lastOpenedFolder = '/valid/opened';
+
+      // /error/dir throws, but we expect it to catch and continue to the next valid option
+      mockFs(['/valid/opened'], [], ['/error/dir']);
+
+      expect(store.getLastDirectory()).toBe('/valid/opened');
+    });
+  });
 });
