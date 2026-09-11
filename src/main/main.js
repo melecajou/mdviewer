@@ -31,7 +31,7 @@ function isPathAllowed(p) {
     for (const allowed of allowedPaths) {
       if (target === allowed) return true;
       const rel = path.relative(allowed, target);
-      if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
+      if (rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))) {
         return true;
       }
     }
@@ -40,6 +40,7 @@ function isPathAllowed(p) {
   }
   return false;
 }
+
 
 // Parse file/folder paths from command line arguments
 function parseCommandLineArgs(argv, cwd = process.cwd()) {
@@ -93,6 +94,7 @@ function parseCommandLineArgs(argv, cwd = process.cwd()) {
       // Check if target exists on disk
       if (fs.existsSync(resolved)) {
         targets.push(resolved);
+        addAllowedPath(resolved);
       }
     } catch (e) {
       console.error('Error checking arg path:', e);
@@ -711,8 +713,10 @@ ipcMain.handle('shell:open-external', (event, url) => {
 });
 
 ipcMain.handle('shell:show-in-folder', (event, filePath) => {
-  if (filePath && fs.existsSync(filePath)) {
+  if (filePath && fs.existsSync(filePath) && isPathAllowed(filePath)) {
     shell.showItemInFolder(filePath);
+  } else {
+    console.warn('Attempted to show restricted path or path does not exist:', filePath);
   }
   return true;
 });
