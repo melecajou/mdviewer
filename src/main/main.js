@@ -13,6 +13,41 @@ let mainWindow = null;
 const store = new Store();
 let watcherManager = null;
 
+// Security: Path validation state
+const allowedPaths = new Set();
+
+// Seed initial allowed paths from store
+const initialData = store.getAll();
+if (initialData.recentFiles) initialData.recentFiles.forEach(f => allowedPaths.add(f));
+if (initialData.recentFolders) initialData.recentFolders.forEach(f => allowedPaths.add(f));
+if (initialData.lastOpenedFolder) allowedPaths.add(initialData.lastOpenedFolder);
+if (initialData.lastDirectory) allowedPaths.add(initialData.lastDirectory);
+
+function addAllowedPath(p) {
+  if (p && typeof p === 'string') {
+    try {
+      allowedPaths.add(path.resolve(p));
+    } catch (e) {
+      // ignore invalid paths
+    }
+  }
+}
+function isPathAllowed(targetPath) {
+  try {
+    const resolvedTarget = path.resolve(targetPath);
+    for (const allowed of allowedPaths) {
+      if (resolvedTarget === allowed) return true;
+      const relative = path.relative(allowed, resolvedTarget);
+      if (relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))) {
+        return true;
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  return false;
+}
+
 // Parse file/folder paths from command line arguments
 function parseCommandLineArgs(argv, cwd = process.cwd()) {
   const targets = [];
@@ -65,6 +100,7 @@ function parseCommandLineArgs(argv, cwd = process.cwd()) {
       // Check if target exists on disk
       if (fs.existsSync(resolved)) {
         targets.push(resolved);
+        addAllowedPath(resolved);
       }
     } catch (e) {
       console.error('Error checking arg path:', e);
@@ -356,6 +392,7 @@ ipcMain.handle('dialog:open-file', async (event, preferredPath) => {
   const result = await dialog.showOpenDialog(mainWindow, options);
   if (!result.canceled && result.filePaths.length > 0) {
     const selected = result.filePaths[0];
+    addAllowedPath(selected);
     store.setLastDirectory(path.dirname(selected));
     return selected;
   }
@@ -375,6 +412,7 @@ ipcMain.handle('dialog:open-folder', async (event, preferredPath) => {
   const result = await dialog.showOpenDialog(mainWindow, options);
   if (!result.canceled && result.filePaths.length > 0) {
     const selected = result.filePaths[0];
+    addAllowedPath(selected);
     store.setLastDirectory(selected);
     store.set('lastOpenedFolder', selected);
     return selected;
@@ -647,8 +685,10 @@ ipcMain.handle('shell:open-external', (event, url) => {
 });
 
 ipcMain.handle('shell:show-in-folder', (event, filePath) => {
-  if (filePath && fs.existsSync(filePath)) {
+  if (filePath && fs.existsSync(filePath) && isPathAllowed(filePath)) {
     shell.showItemInFolder(filePath);
+  } else {
+    console.warn('Attempted to show restricted path or path does not exist:', filePath);
   }
   return true;
 });
