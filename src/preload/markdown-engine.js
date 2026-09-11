@@ -161,7 +161,7 @@ function parseMarkdown(rawContent, options = {}) {
 
     return `
       <h${depth} id="${baseSlug}" class="md-heading md-h${depth}">
-        <span class="heading-anchor" onclick="navigator.clipboard.writeText(window.location.origin + window.location.pathname + '#${baseSlug}')" title="Copiar link da seção">#</span>
+        <span class="heading-anchor" title="Copiar link da seção">#</span>
         <span class="heading-text">${renderedText}</span>
       </h${depth}>
     `;

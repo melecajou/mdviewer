@@ -1398,8 +1398,24 @@ class MDViewerExtensionApp {
     }
 
     const { html, headings, stats } = parsed;
-    this.markdownContainer.innerHTML = html;
+
+    // Inject HTML (Sanitized to prevent XSS)
+    const sanitizedHtml = window.DOMPurify ? window.DOMPurify.sanitize(html, {
+      ADD_TAGS: ['svg', 'path', 'figure', 'figcaption'],
+      ADD_ATTR: ['data-code', 'data-line', 'data-local-path', 'viewBox', 'fill', 'd']
+    }) : html;
+
+    this.markdownContainer.innerHTML = sanitizedHtml;
     this.headings = headings;
+
+    // Attach heading anchor copy link
+    const headingAnchors = this.markdownContainer.querySelectorAll('.heading-anchor');
+    headingAnchors.forEach(anchor => {
+      anchor.addEventListener('click', () => {
+        const id = anchor.parentElement.id;
+        navigator.clipboard.writeText(window.location.origin + window.location.pathname + window.location.search + '#' + id);
+      });
+    });
 
     // Resolver caminhos de imagens relativas baseando-se no caminho do arquivo atual
     const activeTab = this.getActiveTab();

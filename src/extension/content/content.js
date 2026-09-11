@@ -156,8 +156,24 @@
     }
 
     const { html, headings } = window.MDViewerEngine.parseMarkdown(text);
-    renderedContent.innerHTML = html;
+
+    // Inject HTML (Sanitized to prevent XSS)
+    const sanitizedHtml = window.DOMPurify ? window.DOMPurify.sanitize(html, {
+      ADD_TAGS: ['svg', 'path', 'figure', 'figcaption'],
+      ADD_ATTR: ['data-code', 'data-line', 'data-local-path', 'viewBox', 'fill', 'd']
+    }) : html;
+
+    renderedContent.innerHTML = sanitizedHtml;
     rawView.textContent = text;
+
+    // Attach heading anchor copy link
+    const headingAnchors = renderedContent.querySelectorAll('.heading-anchor');
+    headingAnchors.forEach(anchor => {
+      anchor.addEventListener('click', () => {
+        const id = anchor.parentElement.id;
+        navigator.clipboard.writeText(window.location.origin + window.location.pathname + window.location.search + '#' + id);
+      });
+    });
 
     // Renderizar Mermaid
     if (window.mermaid) {
