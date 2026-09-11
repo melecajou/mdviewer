@@ -36,12 +36,23 @@ class Store {
     return { ...this.defaults };
   }
 
-  save() {
+  async save() {
+    if (this._isSaving) {
+      this._saveQueued = true;
+      return;
+    }
+    this._isSaving = true;
+    this._saveQueued = false;
     try {
-      fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
-      fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), 'utf-8');
+      await fs.promises.mkdir(path.dirname(this.filePath), { recursive: true });
+      await fs.promises.writeFile(this.filePath, JSON.stringify(this.data, null, 2), 'utf-8');
     } catch (err) {
       console.error('Error saving settings:', err);
+    } finally {
+      this._isSaving = false;
+      if (this._saveQueued) {
+        this.save();
+      }
     }
   }
 
