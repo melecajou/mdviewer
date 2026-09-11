@@ -1683,10 +1683,7 @@ class MDViewerApp {
     const activeTab = this.tabs.find(t => t.id === this.activeTabId);
     const defaultName = activeTab ? activeTab.fileName.replace(/\.[^/.]+$/, '') + '.pdf' : 'documento.pdf';
     const preferredDir = activeTab ? activeTab.dirName : this.currentFolder;
-    const res = await window.electronAPI.exportPdf({ defaultName, defaultDir: preferredDir });
-    if (res.success) {
-      // PDF saved successfully
-    }
+    await window.electronAPI.exportPdf({ defaultName, defaultDir: preferredDir });
   }
 
   async exportToHtml() {
