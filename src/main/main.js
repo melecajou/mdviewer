@@ -35,10 +35,10 @@ function isPathAllowed(p) {
         return true;
       }
     }
-  } catch (e) {
-    console.error('Error validating path:', e);
+    return false;
+  } catch {
+    return false;
   }
-  return false;
 }
 
 
@@ -750,3 +750,11 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+if (process.env.NODE_ENV === 'test') {
+  module.exports = {
+    isPathAllowed,
+    addAllowedPath,
+    _clearAllowedPaths: () => allowedPaths.clear()
+  };
+}
