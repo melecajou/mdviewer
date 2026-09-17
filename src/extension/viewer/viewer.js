@@ -733,7 +733,14 @@ class MDViewerExtensionApp extends MDViewerBase {
 
     const filtered = filterNodes(this.currentTree);
     if (filtered.length === 0) {
-      this.fileTreeContainer.innerHTML = `<p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-top: 20px;">Nenhum arquivo ou pasta encontrado com "${query}".</p>`;
+      this.fileTreeContainer.innerHTML = '';
+      const p = document.createElement('p');
+      p.style.fontSize = '0.78rem';
+      p.style.color = 'var(--text-muted)';
+      p.style.textAlign = 'center';
+      p.style.marginTop = '20px';
+      p.textContent = `Nenhum arquivo ou pasta encontrado com "${query}".`;
+      this.fileTreeContainer.appendChild(p);
       return;
     }
 
