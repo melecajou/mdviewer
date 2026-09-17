@@ -1254,11 +1254,23 @@ class MDViewerExtensionApp extends MDViewerBase {
       return;
     }
 
-    this.tocContainer.innerHTML = headings.map(h => `
-      <div class="toc-item level-${Math.min(h.level, 4)}" data-id="${h.id}">
-        <span class="toc-text">${h.text}</span>
+    const escapeHtml = (unsafe) => {
+      return (unsafe || '').toString()
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    };
+
+    this.tocContainer.innerHTML = headings.map(h => {
+      const safeText = escapeHtml(h.text);
+      return `
+      <div class="toc-item level-${Math.min(h.level, 4)}" data-id="${h.id}" title="${safeText}">
+        <span class="toc-text">${safeText}</span>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     this.tocContainer.querySelectorAll('.toc-item').forEach(item => {
       item.addEventListener('click', () => {
