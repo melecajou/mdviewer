@@ -716,8 +716,6 @@ ipcMain.handle('shell:open-external', (event, url) => {
 ipcMain.handle('shell:show-in-folder', (event, filePath) => {
   if (filePath && fs.existsSync(filePath) && isPathAllowed(filePath)) {
     shell.showItemInFolder(filePath);
-  } else {
-    console.warn('Attempted to show restricted path or path does not exist:', filePath);
   }
   return true;
 });
