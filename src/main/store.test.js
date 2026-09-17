@@ -124,17 +124,18 @@ describe('Store', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it('should fallback to defaults and handle JSON parse error on empty string', () => {
-      fs.existsSync.mockReturnValue(true);
-      fs.readFileSync.mockReturnValue(''); // Empty string will throw SyntaxError in JSON.parse
+    it('should fallback to defaults and handle empty file string on init', async () => {
+      fs.promises.access.mockResolvedValue(undefined);
+      fs.promises.readFile.mockResolvedValue(''); // Empty string
 
       // Suppress console.error for this test
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
       const store = new Store();
+      await store.init();
 
       expect(store.data).toEqual(store.defaults);
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading settings:', expect.any(SyntaxError));
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
     });
@@ -222,6 +223,80 @@ describe('Store', () => {
       mockFs(['/valid/opened'], [], ['/error/dir']);
 
       expect(store.getLastDirectory()).toBe('/valid/opened');
+    });
+  });
+
+  describe('addRecentFolder', () => {
+    let store;
+
+    beforeEach(() => {
+      store = new Store();
+      store.save = jest.fn(); // Mock save to prevent file writes
+      jest.clearAllMocks();
+    });
+
+    it('should do nothing if folderPath is missing or invalid type', () => {
+      store.addRecentFolder(null);
+      store.addRecentFolder(undefined);
+      store.addRecentFolder(123);
+      store.addRecentFolder({});
+
+      expect(store.data.recentFolders).toEqual([]);
+      expect(store.save).not.toHaveBeenCalled();
+    });
+
+    it('should add a new folder to the beginning of recentFolders and call save', () => {
+      store.addRecentFolder('/some/new/folder');
+
+      expect(store.data.recentFolders).toEqual([path.resolve('/some/new/folder')]);
+      expect(store.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('should remove existing occurrence of the folder and move it to the front', () => {
+      store.data.recentFolders = [
+        path.resolve('/folder/1'),
+        path.resolve('/folder/2'),
+        path.resolve('/folder/3')
+      ];
+
+      store.addRecentFolder('/folder/2');
+
+      expect(store.data.recentFolders).toEqual([
+        path.resolve('/folder/2'),
+        path.resolve('/folder/1'),
+        path.resolve('/folder/3')
+      ]);
+      expect(store.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('should truncate recentFolders to 10 items if limit is exceeded', () => {
+      // Add 10 dummy folders
+      const dummyFolders = Array.from({ length: 10 }, (_, i) => path.resolve(`/folder/${i}`));
+      store.data.recentFolders = [...dummyFolders];
+
+      store.addRecentFolder('/new/folder');
+
+      expect(store.data.recentFolders.length).toBe(10);
+      expect(store.data.recentFolders[0]).toBe(path.resolve('/new/folder'));
+      // The last element should be the 9th dummy folder
+      expect(store.data.recentFolders[9]).toBe(dummyFolders[8]);
+    });
+
+    it('should set lastDirectory if the folder exists on disk', () => {
+      fs.existsSync.mockImplementation((p) => p === path.resolve('/existing/folder'));
+
+      store.addRecentFolder('/existing/folder');
+
+      expect(store.data.lastDirectory).toBe(path.resolve('/existing/folder'));
+    });
+
+    it('should not set lastDirectory if the folder does not exist on disk', () => {
+      fs.existsSync.mockImplementation((p) => false);
+      store.data.lastDirectory = '/previous/dir';
+
+      store.addRecentFolder('/nonexistent/folder');
+
+      expect(store.data.lastDirectory).toBe('/previous/dir');
     });
   });
 });
