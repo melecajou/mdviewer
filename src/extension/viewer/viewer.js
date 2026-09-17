@@ -1242,9 +1242,7 @@ class MDViewerExtensionApp extends MDViewerBase {
         window.mermaid.run({
           nodes: this.markdownContainer.querySelectorAll('.mermaid')
         });
-      } catch (err) {
-        console.warn('Erro na renderização Mermaid:', err);
-      }
+      } catch {}
     }
   }
 
