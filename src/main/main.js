@@ -750,3 +750,12 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+// Export for testing
+if (process.env.NODE_ENV === 'test') {
+  module.exports = {
+    addAllowedPath,
+    allowedPaths,
+    isPathAllowed
+  };
+}
