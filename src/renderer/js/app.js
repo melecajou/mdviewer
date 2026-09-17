@@ -960,12 +960,18 @@ class MDViewerApp extends MDViewerBase {
     // Auto-open first markdown file if enabled and no tab is currently open
     if (autoOpenFile && this.tabs.length === 0 && this.currentTree.length > 0) {
       const findFirstMd = (nodes) => {
-        for (const node of nodes) {
-          if (!node.isDirectory && node.isMarkdown) return node.path;
-          if (node.isDirectory && node.children) {
-            const found = findFirstMd(node.children);
-            if (found) return found;
+        let currentLevel = nodes;
+        while (currentLevel.length > 0) {
+          const nextLevel = [];
+          for (const node of currentLevel) {
+            if (!node.isDirectory && node.isMarkdown) return node.path;
+            if (node.isDirectory && node.children) {
+              for (const child of node.children) {
+                nextLevel.push(child);
+              }
+            }
           }
+          currentLevel = nextLevel;
         }
         return null;
       };
