@@ -187,8 +187,7 @@
         window.mermaid.run({
           nodes: renderedContent.querySelectorAll('.mermaid')
         });
-      } catch (err) {
-        console.warn('Mermaid rendering error:', err);
+      } catch {
       }
     }
 
