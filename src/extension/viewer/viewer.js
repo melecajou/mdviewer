@@ -125,9 +125,7 @@ class MDViewerExtensionApp extends MDViewerBase {
         this.switchSidebarTab(this.settings.sidebarTab);
       }
       this.renderRecentFiles();
-    } catch (e) {
-      console.warn('Erro ao carregar configurações:', e);
-    }
+    } catch {}
   }
 
   saveSettings() {
