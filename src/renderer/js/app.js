@@ -395,8 +395,6 @@ class MDViewerApp extends MDViewerBase {
       if (tab) {
         if (event === 'change') {
           this.reloadTab(tab.id, true);
-        } else if (event === 'unlink') {
-          console.warn('File was deleted from disk:', filePath);
         }
       }
     });
