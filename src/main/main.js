@@ -391,7 +391,7 @@ function createAppMenu() {
 
 // Dialog: Open File
 ipcMain.handle('dialog:open-file', async (event, preferredPath) => {
-  const defaultPath = store.getLastDirectory(preferredPath);
+  const defaultPath = await store.getLastDirectory(preferredPath);
   const options = {
     title: 'Abrir Arquivo Markdown',
     properties: ['openFile'],
@@ -416,7 +416,7 @@ ipcMain.handle('dialog:open-file', async (event, preferredPath) => {
 
 // Dialog: Open Folder
 ipcMain.handle('dialog:open-folder', async (event, preferredPath) => {
-  const defaultPath = store.getLastDirectory(preferredPath);
+  const defaultPath = await store.getLastDirectory(preferredPath);
   const options = {
     title: 'Abrir Pasta no Explorador',
     properties: ['openDirectory']
@@ -503,7 +503,7 @@ ipcMain.handle('file:save', async (event, { filePath, content }) => {
 // File: Save As Dialog
 ipcMain.handle('file:save-as', async (event, { content, defaultName, defaultDir }) => {
   try {
-    const dir = store.getLastDirectory(defaultDir);
+    const dir = await store.getLastDirectory(defaultDir);
     const defaultPath = dir ? path.join(dir, defaultName || 'documento.md') : (defaultName || 'documento.md');
     const result = await dialog.showSaveDialog(mainWindow, {
       title: 'Salvar Arquivo Como',
@@ -641,7 +641,7 @@ ipcMain.handle('file:unwatch', (event, filePath) => {
 
 // Export: Save HTML
 ipcMain.handle('export:html', async (event, { defaultName, htmlContent, defaultDir }) => {
-  const dir = store.getLastDirectory(defaultDir);
+  const dir = await store.getLastDirectory(defaultDir);
   const defaultPath = dir ? path.join(dir, defaultName || 'documento.html') : (defaultName || 'documento.html');
   const result = await dialog.showSaveDialog(mainWindow, {
     title: 'Exportar como HTML',
@@ -663,7 +663,7 @@ ipcMain.handle('export:html', async (event, { defaultName, htmlContent, defaultD
 
 // Export: Save PDF
 ipcMain.handle('export:pdf', async (event, { defaultName, defaultDir }) => {
-  const dir = store.getLastDirectory(defaultDir);
+  const dir = await store.getLastDirectory(defaultDir);
   const defaultPath = dir ? path.join(dir, defaultName || 'documento.pdf') : (defaultName || 'documento.pdf');
   const result = await dialog.showSaveDialog(mainWindow, {
     title: 'Exportar como PDF',
