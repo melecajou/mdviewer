@@ -707,8 +707,15 @@ ipcMain.handle('store:remove-recent-file', (event, filePath) => {
 
 // Shell & Utilities
 ipcMain.handle('shell:open-external', (event, url) => {
-  if (url && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('mailto:'))) {
-    shell.openExternal(url);
+  if (url) {
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:' || parsedUrl.protocol === 'mailto:') {
+        shell.openExternal(parsedUrl.href);
+      }
+    } catch {
+      // Invalid URL or error parsing, ignore silently
+    }
   }
   return true;
 });
