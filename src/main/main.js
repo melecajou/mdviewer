@@ -750,3 +750,8 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+
+if (process.env.NODE_ENV === "test") {
+  module.exports = { parseCommandLineArgs };
+}
