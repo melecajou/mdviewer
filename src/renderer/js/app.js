@@ -586,7 +586,6 @@ class MDViewerApp extends MDViewerBase {
     const tab = this.tabs.find(t => t.id === tabId);
     if (!tab) return;
     if (tab.isDirty) {
-      console.warn('Skipping auto-reload because tab has unsaved changes:', tab.filePath);
       return;
     }
 
