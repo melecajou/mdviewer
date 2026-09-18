@@ -210,17 +210,29 @@
     });
   }
 
+  function escapeHtml(unsafe) {
+    return (unsafe || '').toString()
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   function renderToc(headings) {
     if (!headings || headings.length === 0) {
       tocNav.innerHTML = `<span style="font-size:11px; color:var(--text-muted);">Nenhum título encontrado</span>`;
       return;
     }
 
-    tocNav.innerHTML = headings.map(h => `
-      <a href="#${h.id}" class="mdviewer-toc-link level-${Math.min(h.level, 4)}" title="${h.text}">
-        ${h.text}
+    tocNav.innerHTML = headings.map(h => {
+      const safeText = escapeHtml(h.text);
+      return `
+      <a href="#${h.id}" class="mdviewer-toc-link level-${Math.min(h.level, 4)}" title="${safeText}">
+        ${safeText}
       </a>
-    `).join('');
+    `;
+    }).join('');
   }
 
   // Eventos de controles
