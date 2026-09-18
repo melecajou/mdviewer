@@ -42,7 +42,8 @@
   "devDependencies": {
     "electron": "^30.0.0",
     "electron-builder": "^26.15.3",
-    "jest": "^30.5.1"
+    "jest": "^30.5.1",
+    "jest-environment-jsdom": "^30.5.1"
   },
   "build": {
     "appId": "com.mdviewer.app",

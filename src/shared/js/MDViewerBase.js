@@ -290,3 +290,7 @@ class MDViewerBase {
     this.clearFindHighlights();
   }
 }
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = MDViewerBase;
+}
