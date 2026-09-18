@@ -141,6 +141,86 @@ describe('Store', () => {
     });
   });
 
+  describe('addRecentFile', () => {
+    let store;
+
+    beforeEach(() => {
+      fs.existsSync.mockReturnValue(true);
+      store = new Store();
+      store.save = jest.fn();
+      store.data.recentFiles = [];
+    });
+
+    it('should do nothing if filePath is missing or not a string', () => {
+      store.addRecentFile();
+      store.addRecentFile(null);
+      store.addRecentFile(123);
+      store.addRecentFile({});
+
+      expect(store.data.recentFiles).toEqual([]);
+      expect(store.save).not.toHaveBeenCalled();
+    });
+
+    it('should add a new file to the beginning of recentFiles and call save()', () => {
+      store.data.recentFiles = ['/existing/file.txt'];
+      const newFile = '/new/file.md';
+
+      store.addRecentFile(newFile);
+
+      expect(store.data.recentFiles).toEqual([
+        path.resolve(newFile),
+        '/existing/file.txt'
+      ]);
+      expect(store.save).toHaveBeenCalled();
+    });
+
+    it('should move an existing file to the beginning of recentFiles', () => {
+      store.data.recentFiles = ['/file1.txt', '/file2.txt', '/file3.txt'];
+      const fileToMove = '/file2.txt';
+
+      store.addRecentFile(fileToMove);
+
+      expect(store.data.recentFiles).toEqual([
+        path.resolve(fileToMove),
+        '/file1.txt',
+        '/file3.txt'
+      ]);
+      expect(store.save).toHaveBeenCalled();
+    });
+
+    it('should truncate recentFiles to 20 items', () => {
+      store.data.recentFiles = Array.from({ length: 20 }, (_, i) => `/file${i}.txt`);
+      const newFile = '/new/file.md';
+
+      store.addRecentFile(newFile);
+
+      expect(store.data.recentFiles.length).toBe(20);
+      expect(store.data.recentFiles[0]).toBe(path.resolve(newFile));
+      expect(store.data.recentFiles[19]).toBe('/file18.txt');
+    });
+
+    it('should set lastDirectory if the directory of the file exists', () => {
+      const newFile = '/path/to/existing/dir/file.md';
+      fs.existsSync.mockImplementation((p) => p === path.dirname(path.resolve(newFile)));
+
+      store.addRecentFile(newFile);
+
+      expect(store.data.lastDirectory).toBe(path.dirname(path.resolve(newFile)));
+      expect(store.save).toHaveBeenCalled();
+    });
+
+    it('should not set lastDirectory if the directory of the file does not exist', () => {
+      const newFile = '/path/to/nonexistent/dir/file.md';
+      store.data.lastDirectory = '/previous/last/dir';
+      fs.existsSync.mockReturnValue(false);
+
+      store.addRecentFile(newFile);
+
+      expect(store.data.lastDirectory).toBe('/previous/last/dir');
+      expect(store.save).toHaveBeenCalled();
+    });
+  });
+
   describe('getLastDirectory', () => {
     let store;
 
