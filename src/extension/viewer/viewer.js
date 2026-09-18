@@ -125,9 +125,7 @@ class MDViewerExtensionApp extends MDViewerBase {
         this.switchSidebarTab(this.settings.sidebarTab);
       }
       this.renderRecentFiles();
-    } catch (e) {
-      console.warn('Erro ao carregar configurações:', e);
-    }
+    } catch {}
   }
 
   saveSettings() {
@@ -733,7 +731,14 @@ class MDViewerExtensionApp extends MDViewerBase {
 
     const filtered = filterNodes(this.currentTree);
     if (filtered.length === 0) {
-      this.fileTreeContainer.innerHTML = `<p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-top: 20px;">Nenhum arquivo ou pasta encontrado com "${query}".</p>`;
+      this.fileTreeContainer.innerHTML = '';
+      const p = document.createElement('p');
+      p.style.fontSize = '0.78rem';
+      p.style.color = 'var(--text-muted)';
+      p.style.textAlign = 'center';
+      p.style.marginTop = '20px';
+      p.textContent = `Nenhum arquivo ou pasta encontrado com "${query}".`;
+      this.fileTreeContainer.appendChild(p);
       return;
     }
 
@@ -1139,8 +1144,7 @@ class MDViewerExtensionApp extends MDViewerBase {
 
     // Inject HTML (Sanitized to prevent XSS)
     const sanitizedHtml = window.DOMPurify ? window.DOMPurify.sanitize(html, {
-      ADD_TAGS: ['svg', 'path', 'figure', 'figcaption'],
-      ADD_ATTR: ['data-code', 'data-line', 'data-local-path', 'viewBox', 'fill', 'd']
+      USE_PROFILES: { html: true }
     }) : html;
 
     this.markdownContainer.innerHTML = sanitizedHtml;
@@ -1242,9 +1246,7 @@ class MDViewerExtensionApp extends MDViewerBase {
         window.mermaid.run({
           nodes: this.markdownContainer.querySelectorAll('.mermaid')
         });
-      } catch (err) {
-        console.warn('Erro na renderização Mermaid:', err);
-      }
+      } catch {}
     }
   }
 
@@ -1254,11 +1256,23 @@ class MDViewerExtensionApp extends MDViewerBase {
       return;
     }
 
-    this.tocContainer.innerHTML = headings.map(h => `
-      <div class="toc-item level-${Math.min(h.level, 4)}" data-id="${h.id}">
-        <span class="toc-text">${h.text}</span>
+    const escapeHtml = (unsafe) => {
+      return (unsafe || '').toString()
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    };
+
+    this.tocContainer.innerHTML = headings.map(h => {
+      const safeText = escapeHtml(h.text);
+      return `
+      <div class="toc-item level-${Math.min(h.level, 4)}" data-id="${h.id}" title="${safeText}">
+        <span class="toc-text">${safeText}</span>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     this.tocContainer.querySelectorAll('.toc-item').forEach(item => {
       item.addEventListener('click', () => {

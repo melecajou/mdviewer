@@ -395,8 +395,6 @@ class MDViewerApp extends MDViewerBase {
       if (tab) {
         if (event === 'change') {
           this.reloadTab(tab.id, true);
-        } else if (event === 'unlink') {
-          console.warn('File was deleted from disk:', filePath);
         }
       }
     });
@@ -586,7 +584,6 @@ class MDViewerApp extends MDViewerBase {
     const tab = this.tabs.find(t => t.id === tabId);
     if (!tab) return;
     if (tab.isDirty) {
-      console.warn('Skipping auto-reload because tab has unsaved changes:', tab.filePath);
       return;
     }
 
@@ -763,8 +760,7 @@ class MDViewerApp extends MDViewerBase {
     
     // Inject HTML (Sanitized to prevent XSS)
     const sanitizedHtml = DOMPurify.sanitize(parsed.html, {
-      ADD_TAGS: ['svg', 'path', 'figure', 'figcaption'],
-      ADD_ATTR: ['data-code', 'data-line', 'data-local-path', 'viewBox', 'fill', 'd']
+      USE_PROFILES: { html: true }
     });
     this.markdownContainer.innerHTML = sanitizedHtml;
     this.headings = parsed.headings || [];
@@ -960,12 +956,18 @@ class MDViewerApp extends MDViewerBase {
     // Auto-open first markdown file if enabled and no tab is currently open
     if (autoOpenFile && this.tabs.length === 0 && this.currentTree.length > 0) {
       const findFirstMd = (nodes) => {
-        for (const node of nodes) {
-          if (!node.isDirectory && node.isMarkdown) return node.path;
-          if (node.isDirectory && node.children) {
-            const found = findFirstMd(node.children);
-            if (found) return found;
+        let currentLevel = nodes;
+        while (currentLevel.length > 0) {
+          const nextLevel = [];
+          for (const node of currentLevel) {
+            if (!node.isDirectory && node.isMarkdown) return node.path;
+            if (node.isDirectory && node.children) {
+              for (const child of node.children) {
+                nextLevel.push(child);
+              }
+            }
           }
+          currentLevel = nextLevel;
         }
         return null;
       };

@@ -90,35 +90,34 @@ class Store {
     }
   }
 
-  getLastDirectory(preferredPath = null) {
-    const isValidDir = (dir) => {
+  async getLastDirectory(preferredPath = null) {
+    const isValidDir = async (dir) => {
       if (!dir || typeof dir !== 'string') return false;
       try {
-        if (fs.existsSync(dir)) {
-          return fs.statSync(dir).isDirectory();
-        }
+        const stats = await fs.promises.stat(dir);
+        return stats.isDirectory();
       } catch {}
       return false;
     };
 
     // 1. Preferred path passed explicitly
-    if (isValidDir(preferredPath)) {
+    if (await isValidDir(preferredPath)) {
       return preferredPath;
     }
     if (preferredPath && typeof preferredPath === 'string') {
       try {
         const parent = path.dirname(preferredPath);
-        if (isValidDir(parent)) return parent;
+        if (await isValidDir(parent)) return parent;
       } catch {}
     }
 
     // 2. Stored lastDirectory
-    if (isValidDir(this.data.lastDirectory)) {
+    if (await isValidDir(this.data.lastDirectory)) {
       return this.data.lastDirectory;
     }
 
     // 3. Stored lastOpenedFolder
-    if (isValidDir(this.data.lastOpenedFolder)) {
+    if (await isValidDir(this.data.lastOpenedFolder)) {
       return this.data.lastOpenedFolder;
     }
 
@@ -127,25 +126,25 @@ class Store {
     for (const f of recents) {
       try {
         const dir = path.dirname(f);
-        if (isValidDir(dir)) return dir;
+        if (await isValidDir(dir)) return dir;
       } catch {}
     }
 
     // 5. Most recent folders
     const recentFolders = this.data.recentFolders || [];
     for (const f of recentFolders) {
-      if (isValidDir(f)) return f;
+      if (await isValidDir(f)) return f;
     }
 
     // 6. Documents or Home folder
     try {
       const docs = app.getPath('documents');
-      if (isValidDir(docs)) return docs;
+      if (await isValidDir(docs)) return docs;
     } catch {}
 
     try {
       const home = app.getPath('home');
-      if (isValidDir(home)) return home;
+      if (await isValidDir(home)) return home;
     } catch {}
 
     return undefined;
