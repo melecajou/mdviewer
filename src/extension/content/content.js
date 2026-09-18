@@ -159,8 +159,7 @@
 
     // Inject HTML (Sanitized to prevent XSS)
     const sanitizedHtml = window.DOMPurify ? window.DOMPurify.sanitize(html, {
-      ADD_TAGS: ['svg', 'path', 'figure', 'figcaption'],
-      ADD_ATTR: ['data-code', 'data-line', 'data-local-path', 'viewBox', 'fill', 'd']
+      USE_PROFILES: { html: true }
     }) : html;
 
     renderedContent.innerHTML = sanitizedHtml;
@@ -187,8 +186,7 @@
         window.mermaid.run({
           nodes: renderedContent.querySelectorAll('.mermaid')
         });
-      } catch (err) {
-        console.warn('Mermaid rendering error:', err);
+      } catch {
       }
     }
 
@@ -212,17 +210,29 @@
     });
   }
 
+  function escapeHtml(unsafe) {
+    return (unsafe || '').toString()
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   function renderToc(headings) {
     if (!headings || headings.length === 0) {
       tocNav.innerHTML = `<span style="font-size:11px; color:var(--text-muted);">Nenhum título encontrado</span>`;
       return;
     }
 
-    tocNav.innerHTML = headings.map(h => `
-      <a href="#${h.id}" class="mdviewer-toc-link level-${Math.min(h.level, 4)}" title="${h.text}">
-        ${h.text}
+    tocNav.innerHTML = headings.map(h => {
+      const safeText = escapeHtml(h.text);
+      return `
+      <a href="#${h.id}" class="mdviewer-toc-link level-${Math.min(h.level, 4)}" title="${safeText}">
+        ${safeText}
       </a>
-    `).join('');
+    `;
+    }).join('');
   }
 
   // Eventos de controles
