@@ -223,164 +223,180 @@ function createWindow() {
   });
 }
 
+function createFileMenu(isMac) {
+  return {
+    label: 'Arquivo',
+    submenu: [
+      {
+        label: 'Novo Arquivo',
+        accelerator: 'CmdOrCtrl+N',
+        click: () => mainWindow && mainWindow.webContents.send('menu:new-file')
+      },
+      {
+        label: 'Abrir Arquivo...',
+        accelerator: 'CmdOrCtrl+O',
+        click: () => mainWindow && mainWindow.webContents.send('menu:open-file')
+      },
+      {
+        label: 'Abrir Pasta...',
+        accelerator: 'CmdOrCtrl+Shift+O',
+        click: () => mainWindow && mainWindow.webContents.send('menu:open-folder')
+      },
+      { type: 'separator' },
+      {
+        label: 'Salvar',
+        accelerator: 'CmdOrCtrl+S',
+        click: () => mainWindow && mainWindow.webContents.send('menu:save-file')
+      },
+      {
+        label: 'Salvar Como...',
+        accelerator: 'CmdOrCtrl+Shift+S',
+        click: () => mainWindow && mainWindow.webContents.send('menu:save-file-as')
+      },
+      { type: 'separator' },
+      {
+        label: 'Fechar Aba',
+        accelerator: 'CmdOrCtrl+W',
+        click: () => mainWindow && mainWindow.webContents.send('menu:close-tab')
+      },
+      {
+        label: 'Recarregar Arquivo',
+        accelerator: 'CmdOrCtrl+R',
+        click: () => mainWindow && mainWindow.webContents.send('menu:reload-file')
+      },
+      { type: 'separator' },
+      {
+        label: 'Exportar para HTML...',
+        accelerator: 'CmdOrCtrl+Shift+E',
+        click: () => mainWindow && mainWindow.webContents.send('menu:export-html')
+      },
+      {
+        label: 'Imprimir / Exportar PDF...',
+        accelerator: 'CmdOrCtrl+P',
+        click: () => mainWindow && mainWindow.webContents.send('menu:export-pdf')
+      },
+      { type: 'separator' },
+      {
+        label: 'Sair',
+        accelerator: isMac ? 'Cmd+Q' : 'Ctrl+Q',
+        click: () => app.quit()
+      }
+    ]
+  };
+}
+
+function createEditMenu(isMac) {
+  return {
+    label: 'Editar',
+    submenu: [
+      { role: 'undo', label: 'Desfazer', accelerator: 'CmdOrCtrl+Z' },
+      { role: 'redo', label: 'Refazer', accelerator: isMac ? 'Cmd+Shift+Z' : 'Ctrl+Y' },
+      { type: 'separator' },
+      { role: 'cut', label: 'Recortar' },
+      { role: 'copy', label: 'Copiar' },
+      { role: 'paste', label: 'Colar' },
+      { type: 'separator' },
+      {
+        label: 'Localizar no Documento',
+        accelerator: 'CmdOrCtrl+F',
+        click: () => mainWindow && mainWindow.webContents.send('menu:find')
+      },
+      { type: 'separator' },
+      { role: 'selectAll', label: 'Selecionar Tudo' }
+    ]
+  };
+}
+
+function createViewMenu() {
+  return {
+    label: 'Visualizar',
+    submenu: [
+      {
+        label: 'Alternar Barra Lateral',
+        accelerator: 'CmdOrCtrl+B',
+        click: () => mainWindow && mainWindow.webContents.send('menu:toggle-sidebar')
+      },
+      {
+        label: 'Alternar Índice (TOC)',
+        accelerator: 'CmdOrCtrl+Shift+T',
+        click: () => mainWindow && mainWindow.webContents.send('menu:toggle-toc')
+      },
+      { type: 'separator' },
+      {
+        label: 'Modo Pré-visualização',
+        accelerator: 'Alt+1',
+        click: () => mainWindow && mainWindow.webContents.send('menu:set-view-mode', 'preview')
+      },
+      {
+        label: 'Modo Dividido (Split)',
+        accelerator: 'Alt+2',
+        click: () => mainWindow && mainWindow.webContents.send('menu:set-view-mode', 'split')
+      },
+      {
+        label: 'Modo Código Fonte',
+        accelerator: 'Alt+3',
+        click: () => mainWindow && mainWindow.webContents.send('menu:set-view-mode', 'source')
+      },
+      { type: 'separator' },
+      {
+        label: 'Aumentar Zoom',
+        accelerator: 'CmdOrCtrl+Plus',
+        click: () => mainWindow && mainWindow.webContents.send('menu:zoom-in')
+      },
+      {
+        label: 'Diminuir Zoom',
+        accelerator: 'CmdOrCtrl+-',
+        click: () => mainWindow && mainWindow.webContents.send('menu:zoom-out')
+      },
+      {
+        label: 'Restaurar Zoom',
+        accelerator: 'CmdOrCtrl+0',
+        click: () => mainWindow && mainWindow.webContents.send('menu:zoom-reset')
+      },
+      { type: 'separator' },
+      { role: 'togglefullscreen', label: 'Tela Cheia' },
+      { role: 'toggleDevTools', label: 'Ferramentas do Desenvolvedor' }
+    ]
+  };
+}
+
+function createHelpMenu() {
+  return {
+    label: 'Ajuda',
+    submenu: [
+      {
+        label: 'Abrir Documento de Exemplo',
+        click: () => mainWindow && mainWindow.webContents.send('menu:open-sample')
+      },
+      {
+        label: 'Atalhos de Teclado',
+        accelerator: 'F1',
+        click: () => mainWindow && mainWindow.webContents.send('menu:show-shortcuts')
+      },
+      { type: 'separator' },
+      {
+        label: 'Sobre o MDViewer',
+        click: () => {
+          dialog.showMessageBox(mainWindow, {
+            type: 'info',
+            title: 'Sobre o MDViewer',
+            message: 'MDViewer Desktop',
+            detail: `Versão 1.0.0\nLeitor e Visualizador de Markdown para Windows e Linux\n\nRecursos:\n• Suporte completo a GFM, Tabelas e Checklists\n• Realce de Sintaxe (Highlight.js)\n• Diagramas Mermaid interativos\n• Fórmulas Matemáticas LaTeX (KaTeX)\n• Callouts e Alertas GitHub\n• Live Reload com Chokidar\n• Exportação para PDF e HTML`
+          });
+        }
+      }
+    ]
+  };
+}
+
 function createAppMenu() {
   const isMac = process.platform === 'darwin';
 
   const template = [
-    {
-      label: 'Arquivo',
-      submenu: [
-        {
-          label: 'Novo Arquivo',
-          accelerator: 'CmdOrCtrl+N',
-          click: () => mainWindow && mainWindow.webContents.send('menu:new-file')
-        },
-        {
-          label: 'Abrir Arquivo...',
-          accelerator: 'CmdOrCtrl+O',
-          click: () => mainWindow && mainWindow.webContents.send('menu:open-file')
-        },
-        {
-          label: 'Abrir Pasta...',
-          accelerator: 'CmdOrCtrl+Shift+O',
-          click: () => mainWindow && mainWindow.webContents.send('menu:open-folder')
-        },
-        { type: 'separator' },
-        {
-          label: 'Salvar',
-          accelerator: 'CmdOrCtrl+S',
-          click: () => mainWindow && mainWindow.webContents.send('menu:save-file')
-        },
-        {
-          label: 'Salvar Como...',
-          accelerator: 'CmdOrCtrl+Shift+S',
-          click: () => mainWindow && mainWindow.webContents.send('menu:save-file-as')
-        },
-        { type: 'separator' },
-        {
-          label: 'Fechar Aba',
-          accelerator: 'CmdOrCtrl+W',
-          click: () => mainWindow && mainWindow.webContents.send('menu:close-tab')
-        },
-        {
-          label: 'Recarregar Arquivo',
-          accelerator: 'CmdOrCtrl+R',
-          click: () => mainWindow && mainWindow.webContents.send('menu:reload-file')
-        },
-        { type: 'separator' },
-        {
-          label: 'Exportar para HTML...',
-          accelerator: 'CmdOrCtrl+Shift+E',
-          click: () => mainWindow && mainWindow.webContents.send('menu:export-html')
-        },
-        {
-          label: 'Imprimir / Exportar PDF...',
-          accelerator: 'CmdOrCtrl+P',
-          click: () => mainWindow && mainWindow.webContents.send('menu:export-pdf')
-        },
-        { type: 'separator' },
-        {
-          label: 'Sair',
-          accelerator: isMac ? 'Cmd+Q' : 'Ctrl+Q',
-          click: () => app.quit()
-        }
-      ]
-    },
-    {
-      label: 'Editar',
-      submenu: [
-        { role: 'undo', label: 'Desfazer', accelerator: 'CmdOrCtrl+Z' },
-        { role: 'redo', label: 'Refazer', accelerator: isMac ? 'Cmd+Shift+Z' : 'Ctrl+Y' },
-        { type: 'separator' },
-        { role: 'cut', label: 'Recortar' },
-        { role: 'copy', label: 'Copiar' },
-        { role: 'paste', label: 'Colar' },
-        { type: 'separator' },
-        {
-          label: 'Localizar no Documento',
-          accelerator: 'CmdOrCtrl+F',
-          click: () => mainWindow && mainWindow.webContents.send('menu:find')
-        },
-        { type: 'separator' },
-        { role: 'selectAll', label: 'Selecionar Tudo' }
-      ]
-    },
-    {
-      label: 'Visualizar',
-      submenu: [
-        {
-          label: 'Alternar Barra Lateral',
-          accelerator: 'CmdOrCtrl+B',
-          click: () => mainWindow && mainWindow.webContents.send('menu:toggle-sidebar')
-        },
-        {
-          label: 'Alternar Índice (TOC)',
-          accelerator: 'CmdOrCtrl+Shift+T',
-          click: () => mainWindow && mainWindow.webContents.send('menu:toggle-toc')
-        },
-        { type: 'separator' },
-        {
-          label: 'Modo Pré-visualização',
-          accelerator: 'Alt+1',
-          click: () => mainWindow && mainWindow.webContents.send('menu:set-view-mode', 'preview')
-        },
-        {
-          label: 'Modo Dividido (Split)',
-          accelerator: 'Alt+2',
-          click: () => mainWindow && mainWindow.webContents.send('menu:set-view-mode', 'split')
-        },
-        {
-          label: 'Modo Código Fonte',
-          accelerator: 'Alt+3',
-          click: () => mainWindow && mainWindow.webContents.send('menu:set-view-mode', 'source')
-        },
-        { type: 'separator' },
-        {
-          label: 'Aumentar Zoom',
-          accelerator: 'CmdOrCtrl+Plus',
-          click: () => mainWindow && mainWindow.webContents.send('menu:zoom-in')
-        },
-        {
-          label: 'Diminuir Zoom',
-          accelerator: 'CmdOrCtrl+-',
-          click: () => mainWindow && mainWindow.webContents.send('menu:zoom-out')
-        },
-        {
-          label: 'Restaurar Zoom',
-          accelerator: 'CmdOrCtrl+0',
-          click: () => mainWindow && mainWindow.webContents.send('menu:zoom-reset')
-        },
-        { type: 'separator' },
-        { role: 'togglefullscreen', label: 'Tela Cheia' },
-        { role: 'toggleDevTools', label: 'Ferramentas do Desenvolvedor' }
-      ]
-    },
-    {
-      label: 'Ajuda',
-      submenu: [
-        {
-          label: 'Abrir Documento de Exemplo',
-          click: () => mainWindow && mainWindow.webContents.send('menu:open-sample')
-        },
-        {
-          label: 'Atalhos de Teclado',
-          accelerator: 'F1',
-          click: () => mainWindow && mainWindow.webContents.send('menu:show-shortcuts')
-        },
-        { type: 'separator' },
-        {
-          label: 'Sobre o MDViewer',
-          click: () => {
-            dialog.showMessageBox(mainWindow, {
-              type: 'info',
-              title: 'Sobre o MDViewer',
-              message: 'MDViewer Desktop',
-              detail: `Versão 1.0.0\nLeitor e Visualizador de Markdown para Windows e Linux\n\nRecursos:\n• Suporte completo a GFM, Tabelas e Checklists\n• Realce de Sintaxe (Highlight.js)\n• Diagramas Mermaid interativos\n• Fórmulas Matemáticas LaTeX (KaTeX)\n• Callouts e Alertas GitHub\n• Live Reload com Chokidar\n• Exportação para PDF e HTML`
-            });
-          }
-        }
-      ]
-    }
+    createFileMenu(isMac),
+    createEditMenu(isMac),
+    createViewMenu(),
+    createHelpMenu()
   ];
 
   const menu = Menu.buildFromTemplate(template);
@@ -391,7 +407,7 @@ function createAppMenu() {
 
 // Dialog: Open File
 ipcMain.handle('dialog:open-file', async (event, preferredPath) => {
-  const defaultPath = store.getLastDirectory(preferredPath);
+  const defaultPath = await store.getLastDirectory(preferredPath);
   const options = {
     title: 'Abrir Arquivo Markdown',
     properties: ['openFile'],
@@ -416,7 +432,7 @@ ipcMain.handle('dialog:open-file', async (event, preferredPath) => {
 
 // Dialog: Open Folder
 ipcMain.handle('dialog:open-folder', async (event, preferredPath) => {
-  const defaultPath = store.getLastDirectory(preferredPath);
+  const defaultPath = await store.getLastDirectory(preferredPath);
   const options = {
     title: 'Abrir Pasta no Explorador',
     properties: ['openDirectory']
@@ -503,7 +519,7 @@ ipcMain.handle('file:save', async (event, { filePath, content }) => {
 // File: Save As Dialog
 ipcMain.handle('file:save-as', async (event, { content, defaultName, defaultDir }) => {
   try {
-    const dir = store.getLastDirectory(defaultDir);
+    const dir = await store.getLastDirectory(defaultDir);
     const defaultPath = dir ? path.join(dir, defaultName || 'documento.md') : (defaultName || 'documento.md');
     const result = await dialog.showSaveDialog(mainWindow, {
       title: 'Salvar Arquivo Como',
@@ -641,7 +657,7 @@ ipcMain.handle('file:unwatch', (event, filePath) => {
 
 // Export: Save HTML
 ipcMain.handle('export:html', async (event, { defaultName, htmlContent, defaultDir }) => {
-  const dir = store.getLastDirectory(defaultDir);
+  const dir = await store.getLastDirectory(defaultDir);
   const defaultPath = dir ? path.join(dir, defaultName || 'documento.html') : (defaultName || 'documento.html');
   const result = await dialog.showSaveDialog(mainWindow, {
     title: 'Exportar como HTML',
@@ -663,7 +679,7 @@ ipcMain.handle('export:html', async (event, { defaultName, htmlContent, defaultD
 
 // Export: Save PDF
 ipcMain.handle('export:pdf', async (event, { defaultName, defaultDir }) => {
-  const dir = store.getLastDirectory(defaultDir);
+  const dir = await store.getLastDirectory(defaultDir);
   const defaultPath = dir ? path.join(dir, defaultName || 'documento.pdf') : (defaultName || 'documento.pdf');
   const result = await dialog.showSaveDialog(mainWindow, {
     title: 'Exportar como PDF',
@@ -707,8 +723,15 @@ ipcMain.handle('store:remove-recent-file', (event, filePath) => {
 
 // Shell & Utilities
 ipcMain.handle('shell:open-external', (event, url) => {
-  if (url && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('mailto:'))) {
-    shell.openExternal(url);
+  if (url) {
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:' || parsedUrl.protocol === 'mailto:') {
+        shell.openExternal(parsedUrl.href);
+      }
+    } catch {
+      // Invalid URL or error parsing, ignore silently
+    }
   }
   return true;
 });
@@ -716,8 +739,6 @@ ipcMain.handle('shell:open-external', (event, url) => {
 ipcMain.handle('shell:show-in-folder', (event, filePath) => {
   if (filePath && fs.existsSync(filePath) && isPathAllowed(filePath)) {
     shell.showItemInFolder(filePath);
-  } else {
-    console.warn('Attempted to show restricted path or path does not exist:', filePath);
   }
   return true;
 });
@@ -753,8 +774,10 @@ app.on('window-all-closed', () => {
 
 if (process.env.NODE_ENV === 'test') {
   module.exports = {
-    isPathAllowed,
     addAllowedPath,
+    allowedPaths,
+    isPathAllowed,
+    parseCommandLineArgs,
     _clearAllowedPaths: () => allowedPaths.clear()
   };
 }
