@@ -772,7 +772,11 @@ app.on('window-all-closed', () => {
   }
 });
 
-
-if (process.env.NODE_ENV === "test") {
-  module.exports = { parseCommandLineArgs };
+if (process.env.NODE_ENV === 'test') {
+  module.exports = {
+    addAllowedPath,
+    allowedPaths,
+    isPathAllowed,
+    parseCommandLineArgs
+  };
 }

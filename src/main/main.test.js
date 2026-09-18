@@ -24,9 +24,25 @@ jest.mock('electron', () => ({
   }
 }));
 
+jest.mock('./store', () => {
+  return jest.fn().mockImplementation(() => ({
+    init: jest.fn().mockResolvedValue(),
+    getAll: jest.fn().mockReturnValue({}),
+    setLastDirectory: jest.fn(),
+    set: jest.fn(),
+    addRecentFile: jest.fn(),
+    addRecentFolder: jest.fn(),
+    getLastDirectory: jest.fn()
+  }));
+});
+
+jest.mock('./file-watcher', () => {
+  return jest.fn().mockImplementation(() => ({}));
+});
+
 const fs = require('fs');
 const path = require('path');
-const { parseCommandLineArgs } = require('./main');
+const { parseCommandLineArgs, addAllowedPath, allowedPaths } = require('./main');
 
 describe('parseCommandLineArgs', () => {
   let originalPlatform;
@@ -176,5 +192,47 @@ describe('parseCommandLineArgs', () => {
 
     expect(result).toEqual([]);
     expect(console.error).toHaveBeenCalledWith('Error checking arg path:', expect.any(Error));
+  });
+});
+
+describe('main.js addAllowedPath', () => {
+  beforeEach(() => {
+    allowedPaths.clear();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('should ignore falsy and non-string inputs', () => {
+    addAllowedPath(null);
+    addAllowedPath(undefined);
+    addAllowedPath(123);
+    addAllowedPath({});
+    expect(allowedPaths.size).toBe(0);
+  });
+
+  it('should add a resolved path to allowedPaths', () => {
+    const testPath = './test/path';
+    addAllowedPath(testPath);
+    expect(allowedPaths.has(path.resolve(testPath))).toBe(true);
+    expect(allowedPaths.size).toBe(1);
+  });
+
+  it('should handle and swallow path.resolve errors', () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    // We can simulate an error by mocking path.resolve briefly
+    const pathResolveMock = jest.spyOn(path, 'resolve').mockImplementation(() => {
+      throw new Error('Test resolve error');
+    });
+
+    expect(() => addAllowedPath('invalid-path')).not.toThrow();
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Error resolving path to allow:', expect.any(Error));
+    expect(allowedPaths.size).toBe(0);
+
+    pathResolveMock.mockRestore();
+    consoleErrorSpy.mockRestore();
   });
 });
