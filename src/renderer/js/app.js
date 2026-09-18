@@ -763,8 +763,7 @@ class MDViewerApp extends MDViewerBase {
     
     // Inject HTML (Sanitized to prevent XSS)
     const sanitizedHtml = DOMPurify.sanitize(parsed.html, {
-      ADD_TAGS: ['svg', 'path', 'figure', 'figcaption'],
-      ADD_ATTR: ['data-code', 'data-line', 'data-local-path', 'viewBox', 'fill', 'd']
+      USE_PROFILES: { html: true }
     });
     this.markdownContainer.innerHTML = sanitizedHtml;
     this.headings = parsed.headings || [];
