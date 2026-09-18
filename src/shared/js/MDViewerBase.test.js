@@ -2,24 +2,70 @@
  * @jest-environment jsdom
  */
 
-const fs = require('fs');
-const path = require('path');
-
-// Read the class definition from the file and eval it so we can test it
-const mdViewerBaseSource = fs.readFileSync(path.join(__dirname, 'MDViewerBase.js'), 'utf8');
-
-// Run it in the test context
-const MDViewerBase = eval(`${mdViewerBaseSource}\nMDViewerBase;`);
+const MDViewerBase = require('./MDViewerBase');
 
 describe('MDViewerBase', () => {
   let viewer;
 
   beforeEach(() => {
-    // Setup fake DOM and environment
     document.body.innerHTML = '';
-
-    // Create an instance
+    document.documentElement.innerHTML = '';
+    document.documentElement.removeAttribute('data-theme');
+    delete window.mermaid;
     viewer = new MDViewerBase();
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('initMermaid', () => {
+    it('should not throw if window.mermaid is undefined', () => {
+      expect(() => viewer.initMermaid()).not.toThrow();
+    });
+
+    it('should initialize mermaid with dark theme if data-theme is dark or null', () => {
+      window.mermaid = {
+        initialize: jest.fn()
+      };
+
+      // Case 1: data-theme is null (removed above)
+      viewer.initMermaid();
+      expect(window.mermaid.initialize).toHaveBeenCalledWith({
+        startOnLoad: false,
+        theme: 'dark',
+        securityLevel: 'strict',
+        flowchart: { htmlLabels: true, curve: 'basis' }
+      });
+
+      window.mermaid.initialize.mockClear();
+
+      // Case 2: data-theme is 'dark'
+      document.documentElement.setAttribute('data-theme', 'dark');
+      viewer.initMermaid();
+      expect(window.mermaid.initialize).toHaveBeenCalledWith({
+        startOnLoad: false,
+        theme: 'dark',
+        securityLevel: 'strict',
+        flowchart: { htmlLabels: true, curve: 'basis' }
+      });
+    });
+
+    it('should initialize mermaid with default theme if data-theme is light', () => {
+      window.mermaid = {
+        initialize: jest.fn()
+      };
+
+      document.documentElement.setAttribute('data-theme', 'light');
+      viewer.initMermaid();
+
+      expect(window.mermaid.initialize).toHaveBeenCalledWith({
+        startOnLoad: false,
+        theme: 'default',
+        securityLevel: 'strict',
+        flowchart: { htmlLabels: true, curve: 'basis' }
+      });
+    });
   });
 
   describe('showSaveFeedback', () => {
@@ -33,7 +79,6 @@ describe('MDViewerBase', () => {
     });
 
     it('should set text content to the default "Salvo!", update color, and restore after 1500ms', () => {
-      // Mock DOM structure
       const btn = document.createElement('button');
       const span = document.createElement('span');
       span.textContent = 'Save';
@@ -42,23 +87,19 @@ describe('MDViewerBase', () => {
 
       viewer.showSaveFeedback();
 
-      // Check initial state
       expect(span.textContent).toBe('Salvo!');
-      expect(btn.style.color).toBe('rgb(63, 185, 80)'); // Hex #3fb950 converts to this in JSDOM
+      expect(btn.style.color).toBe('rgb(63, 185, 80)');
 
-      // Advance time by 1499ms (not enough to trigger restore)
       jest.advanceTimersByTime(1499);
       expect(span.textContent).toBe('Salvo!');
       expect(btn.style.color).toBe('rgb(63, 185, 80)');
 
-      // Advance time by 1ms (to 1500ms, should trigger restore)
       jest.advanceTimersByTime(1);
       expect(span.textContent).toBe('Save');
       expect(btn.style.color).toBe('');
     });
 
     it('should set text content to the provided argument, update color, and restore after 1500ms', () => {
-      // Mock DOM structure
       const btn = document.createElement('button');
       const span = document.createElement('span');
       span.textContent = 'Guardar';
@@ -67,11 +108,9 @@ describe('MDViewerBase', () => {
 
       viewer.showSaveFeedback('Saved custom!');
 
-      // Check initial state
       expect(span.textContent).toBe('Saved custom!');
       expect(btn.style.color).toBe('rgb(63, 185, 80)');
 
-      // Advance time by 1500ms
       jest.advanceTimersByTime(1500);
 
       expect(span.textContent).toBe('Guardar');
@@ -88,7 +127,6 @@ describe('MDViewerBase', () => {
 
     it('should handle missing span inside this.btnSaveFile gracefully', () => {
       const btn = document.createElement('button');
-      // No span appended
       viewer.btnSaveFile = btn;
 
       expect(() => {

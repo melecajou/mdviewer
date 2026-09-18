@@ -119,13 +119,8 @@ function splitHighlightedLines(html) {
   return result;
 }
 
-function parseMarkdown(rawContent, options = {}) {
-  const headings = [];
+function createCustomRenderer(headings) {
   const slugCounts = {};
-
-  const { markdown: preparedMarkdown, restoreMath } = processMath(rawContent);
-
-  // Configure marked custom renderer
   const renderer = new marked.Renderer();
 
   // Custom heading renderer with slug & outline extraction
@@ -369,6 +364,15 @@ function parseMarkdown(rawContent, options = {}) {
       </figure>
     `;
   };
+
+  return renderer;
+}
+
+function parseMarkdown(rawContent, options = {}) {
+  const headings = [];
+  const { markdown: preparedMarkdown, restoreMath } = processMath(rawContent);
+
+  const renderer = createCustomRenderer(headings);
 
   marked.setOptions({
     gfm: true,
