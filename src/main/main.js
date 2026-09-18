@@ -35,10 +35,10 @@ function isPathAllowed(p) {
         return true;
       }
     }
-  } catch (e) {
-    console.error('Error validating path:', e);
+    return false;
+  } catch {
+    return false;
   }
-  return false;
 }
 
 
@@ -777,6 +777,7 @@ if (process.env.NODE_ENV === 'test') {
     addAllowedPath,
     allowedPaths,
     isPathAllowed,
-    parseCommandLineArgs
+    parseCommandLineArgs,
+    _clearAllowedPaths: () => allowedPaths.clear()
   };
 }

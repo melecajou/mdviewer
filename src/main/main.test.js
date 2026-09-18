@@ -42,7 +42,7 @@ jest.mock('./file-watcher', () => {
 
 const fs = require('fs');
 const path = require('path');
-const { parseCommandLineArgs, addAllowedPath, allowedPaths } = require('./main');
+const { parseCommandLineArgs, addAllowedPath, allowedPaths, isPathAllowed, _clearAllowedPaths } = require('./main');
 
 describe('parseCommandLineArgs', () => {
   let originalPlatform;
@@ -160,11 +160,6 @@ describe('parseCommandLineArgs', () => {
 
     it('should gracefully handle malformed file:// URIs using regex fallback', () => {
       // Create a malformed URL that fails `new URL(arg)`
-      // In Node.js, things like `file://%` might throw URIError on decodeURIComponent,
-      // but new URL('file://malformed') might just work.
-      // Let's force an error by mocking URL constructor globally temporarily or providing an invalid URL structure.
-
-      // new URL('file://') actually works but throws if it's completely busted, but we can also mock it.
       const originalURL = global.URL;
       global.URL = jest.fn(() => { throw new Error('Invalid URL'); });
 
@@ -234,5 +229,85 @@ describe('main.js addAllowedPath', () => {
 
     pathResolveMock.mockRestore();
     consoleErrorSpy.mockRestore();
+  });
+});
+
+describe('isPathAllowed', () => {
+  beforeEach(() => {
+    _clearAllowedPaths();
+    jest.clearAllMocks();
+  });
+
+  it('should return false for falsy or non-string inputs', () => {
+    expect(isPathAllowed(null)).toBe(false);
+    expect(isPathAllowed(undefined)).toBe(false);
+    expect(isPathAllowed('')).toBe(false);
+    expect(isPathAllowed(123)).toBe(false);
+    expect(isPathAllowed({})).toBe(false);
+    expect(isPathAllowed([])).toBe(false);
+  });
+
+  it('should return true for an exact allowed path', () => {
+    const testPath = path.resolve('/test/directory');
+    addAllowedPath(testPath);
+    expect(isPathAllowed(testPath)).toBe(true);
+  });
+
+  it('should return true for a file inside an allowed directory', () => {
+    const allowedDir = path.resolve('/test/directory');
+    addAllowedPath(allowedDir);
+
+    const fileInside = path.join(allowedDir, 'file.md');
+    expect(isPathAllowed(fileInside)).toBe(true);
+  });
+
+  it('should return true for a nested file inside an allowed directory', () => {
+    const allowedDir = path.resolve('/test/directory');
+    addAllowedPath(allowedDir);
+
+    const nestedFile = path.join(allowedDir, 'subdir', 'nested.md');
+    expect(isPathAllowed(nestedFile)).toBe(true);
+  });
+
+  it('should return false for a path outside of any allowed directory', () => {
+    const allowedDir = path.resolve('/test/directory');
+    addAllowedPath(allowedDir);
+
+    const outsidePath = path.resolve('/another/directory/file.md');
+    expect(isPathAllowed(outsidePath)).toBe(false);
+  });
+
+  it('should return false for a path that tries to traverse up and out of the allowed directory', () => {
+    const allowedDir = path.resolve('/test/directory');
+    addAllowedPath(allowedDir);
+
+    // e.g., /test/directory/../other/file.md -> resolves to /test/other/file.md
+    const sneakyPath = path.join(allowedDir, '..', 'other', 'file.md');
+    expect(isPathAllowed(sneakyPath)).toBe(false);
+  });
+
+  it('should handle multiple allowed paths', () => {
+    const allowedDir1 = path.resolve('/test/dir1');
+    const allowedDir2 = path.resolve('/test/dir2');
+
+    addAllowedPath(allowedDir1);
+    addAllowedPath(allowedDir2);
+
+    expect(isPathAllowed(path.join(allowedDir1, 'file1.md'))).toBe(true);
+    expect(isPathAllowed(path.join(allowedDir2, 'file2.md'))).toBe(true);
+    expect(isPathAllowed(path.resolve('/test/dir3/file3.md'))).toBe(false);
+  });
+
+  it('should handle malicious path resolution failures gracefully', () => {
+    const originalResolve = path.resolve;
+    path.resolve = jest.fn(() => {
+      throw new Error('Simulated path resolution error');
+    });
+
+    try {
+      expect(isPathAllowed('/test/directory')).toBe(false);
+    } finally {
+      path.resolve = originalResolve;
+    }
   });
 });
