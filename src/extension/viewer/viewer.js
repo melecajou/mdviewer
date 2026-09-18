@@ -512,14 +512,17 @@ class MDViewerExtensionApp extends MDViewerBase {
       const rel = file.webkitRelativePath || file.name;
       const parts = rel.split('/');
       const startIndex = (parts.length > 1 && parts[0] === folderName) ? 1 : 0;
+      const prefixOffset = (startIndex === 1) ? parts[0].length + 1 : 0;
 
       let currentLevel = root.children;
-      let accumulated = '';
+      let currentEnd = prefixOffset;
 
       for (let i = startIndex; i < parts.length; i++) {
         const part = parts[i];
         const isFile = (i === parts.length - 1);
-        accumulated = accumulated ? `${accumulated}/${part}` : part;
+        currentEnd += part.length;
+        const accumulated = rel.substring(prefixOffset, currentEnd);
+        currentEnd += 1;
 
         if (isFile) {
           currentLevel.push({
