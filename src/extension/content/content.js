@@ -158,9 +158,13 @@
     const { html, headings } = window.MDViewerEngine.parseMarkdown(text);
 
     // Inject HTML (Sanitized to prevent XSS)
-    const sanitizedHtml = window.DOMPurify ? window.DOMPurify.sanitize(html, {
+    const purify = window.DOMPurify || (typeof DOMPurify !== 'undefined' ? DOMPurify : null);
+    if (!purify || typeof purify.sanitize !== 'function') {
+      throw new Error('DOMPurify library is required for rendering markdown content securely.');
+    }
+    const sanitizedHtml = purify.sanitize(html, {
       USE_PROFILES: { html: true }
-    }) : html;
+    });
 
     renderedContent.innerHTML = sanitizedHtml;
     rawView.textContent = text;
