@@ -45,6 +45,12 @@
     "jest": "^30.5.1",
     "jest-environment-jsdom": "^30.5.1"
   },
+  "jest": {
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/"
+    ]
+  },
   "build": {
     "appId": "com.mdviewer.app",
     "productName": "MDViewer",
