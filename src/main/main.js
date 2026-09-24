@@ -736,9 +736,14 @@ ipcMain.handle('shell:open-external', (event, url) => {
   return true;
 });
 
-ipcMain.handle('shell:show-in-folder', (event, filePath) => {
-  if (filePath && fs.existsSync(filePath) && isPathAllowed(filePath)) {
-    shell.showItemInFolder(filePath);
+ipcMain.handle('shell:show-in-folder', async (event, filePath) => {
+  if (filePath && isPathAllowed(filePath)) {
+    try {
+      await fs.promises.access(filePath);
+      shell.showItemInFolder(filePath);
+    } catch {
+      // File does not exist or inaccessible, ignore silently
+    }
   }
   return true;
 });
