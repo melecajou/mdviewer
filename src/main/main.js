@@ -41,6 +41,51 @@ function isPathAllowed(p) {
   }
 }
 
+function isSystemOrRootDirectory(p) {
+  if (!p || typeof p !== 'string') return true;
+  try {
+    const resolved = path.resolve(p);
+    const parsed = path.parse(resolved);
+
+    // Root directory check
+    if (resolved === parsed.root) {
+      return true;
+    }
+
+    const norm = resolved.toLowerCase();
+
+    // Sensitive POSIX system directories
+    const posixSysDirs = [
+      '/etc', '/bin', '/sbin', '/usr', '/var', '/dev',
+      '/proc', '/sys', '/boot', '/lib', '/lib64', '/root'
+    ];
+    for (const sysDir of posixSysDirs) {
+      const sysDirResolved = path.resolve(sysDir).toLowerCase();
+      if (norm === sysDirResolved || norm.startsWith(sysDirResolved + path.sep)) {
+        return true;
+      }
+    }
+
+    // Sensitive Windows system directories
+    if (process.platform === 'win32') {
+      const winSysDirs = [
+        'c:\\windows',
+        'c:\\program files',
+        'c:\\program files (x86)'
+      ];
+      for (const sysDir of winSysDirs) {
+        if (norm === sysDir || norm.startsWith(sysDir + '\\')) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 
 // Parse file/folder paths from command line arguments
 function parseCommandLineArgs(argv, cwd = process.cwd()) {
@@ -756,12 +801,50 @@ ipcMain.handle('app:get-initial-targets', () => {
 });
 
 // Allow user dropped path
-ipcMain.handle('app:allow-dropped-path', (event, targetPath) => {
-  if (targetPath && typeof targetPath === 'string' && fs.existsSync(targetPath)) {
-    addAllowedPath(targetPath);
-    addAllowedPath(path.dirname(targetPath));
-    return true;
+ipcMain.handle('app:allow-dropped-path', async (event, targetPath) => {
+  if (!event || !event.sender || typeof event.sender.isDestroyed !== 'function' || event.sender.isDestroyed()) {
+    return false;
   }
+  if (mainWindow && !mainWindow.isDestroyed() && event.sender !== mainWindow.webContents) {
+    return false;
+  }
+
+  if (!targetPath || typeof targetPath !== 'string') {
+    return false;
+  }
+
+  try {
+    const resolvedPath = path.resolve(targetPath);
+    if (!path.isAbsolute(resolvedPath)) {
+      return false;
+    }
+
+    const stats = await fs.promises.stat(resolvedPath);
+
+    if (stats.isDirectory()) {
+      if (isSystemOrRootDirectory(resolvedPath)) {
+        return false;
+      }
+      addAllowedPath(resolvedPath);
+      return true;
+    } else if (stats.isFile()) {
+      const ext = path.extname(resolvedPath).toLowerCase();
+      const allowedExtensions = ['.md', '.markdown', '.mdown', '.mkd', '.mdx', '.txt'];
+      if (!allowedExtensions.includes(ext)) {
+        return false;
+      }
+
+      addAllowedPath(resolvedPath);
+      const parentDir = path.dirname(resolvedPath);
+      if (!isSystemOrRootDirectory(parentDir)) {
+        addAllowedPath(parentDir);
+      }
+      return true;
+    }
+  } catch {
+    return false;
+  }
+
   return false;
 });
 
@@ -777,6 +860,7 @@ if (process.env.NODE_ENV === 'test') {
     addAllowedPath,
     allowedPaths,
     isPathAllowed,
+    isSystemOrRootDirectory,
     parseCommandLineArgs,
     _clearAllowedPaths: () => allowedPaths.clear()
   };
