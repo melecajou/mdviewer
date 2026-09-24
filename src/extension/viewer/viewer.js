@@ -539,22 +539,20 @@ class MDViewerExtensionApp extends MDViewerBase {
 
   renderFileListInExplorer(folderName, files) {
     const root = { name: folderName, isDirectory: true, children: [] };
+    const folderMap = new Map();
 
     for (const file of files) {
       const rel = file.webkitRelativePath || file.name;
       const parts = rel.split('/');
       const startIndex = (parts.length > 1 && parts[0] === folderName) ? 1 : 0;
-      const prefixOffset = (startIndex === 1) ? parts[0].length + 1 : 0;
 
       let currentLevel = root.children;
-      let currentEnd = prefixOffset;
+      let accumulated = '';
 
       for (let i = startIndex; i < parts.length; i++) {
         const part = parts[i];
         const isFile = (i === parts.length - 1);
-        currentEnd += part.length;
-        const accumulated = rel.substring(prefixOffset, currentEnd);
-        currentEnd += 1;
+        accumulated = accumulated ? accumulated + '/' + part : part;
 
         if (isFile) {
           currentLevel.push({
@@ -566,7 +564,7 @@ class MDViewerExtensionApp extends MDViewerBase {
             fileObject: file
           });
         } else {
-          let folder = currentLevel.find(item => item.isDirectory && item.name === part);
+          let folder = folderMap.get(accumulated);
           if (!folder) {
             folder = {
               name: part,
@@ -576,6 +574,7 @@ class MDViewerExtensionApp extends MDViewerBase {
               children: []
             };
             currentLevel.push(folder);
+            folderMap.set(accumulated, folder);
           }
           currentLevel = folder.children;
         }
