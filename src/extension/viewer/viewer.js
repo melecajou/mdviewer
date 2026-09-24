@@ -86,8 +86,8 @@ class MDViewerExtensionApp extends MDViewerBase {
     this.findBar = document.getElementById('find-bar');
     this.findInput = document.getElementById('find-input');
     this.findCount = document.getElementById('find-count');
-    this.findPrev = document.getElementById('find-prev');
-    this.findNext = document.getElementById('find-next');
+    this.btnFindPrev = document.getElementById('find-prev');
+    this.btnFindNext = document.getElementById('find-next');
     this.findClose = document.getElementById('find-close');
 
     // Status Bar
@@ -271,8 +271,8 @@ class MDViewerExtensionApp extends MDViewerBase {
         this.closeFindBar();
       }
     });
-    this.findNext.addEventListener('click', () => this.findNext());
-    this.findPrev.addEventListener('click', () => this.findPrevious());
+    this.btnFindNext.addEventListener('click', () => this.findNext());
+    this.btnFindPrev.addEventListener('click', () => this.findPrevious());
     this.findClose.addEventListener('click', () => this.closeFindBar());
 
     // Modals
@@ -1498,3 +1498,7 @@ Equação em linha: $E = mc^2$.
 window.addEventListener('DOMContentLoaded', () => {
   window.mdViewerApp = new MDViewerExtensionApp();
 });
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = MDViewerExtensionApp;
+}
