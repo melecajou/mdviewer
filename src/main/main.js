@@ -723,10 +723,15 @@ ipcMain.handle('store:remove-recent-file', (event, filePath) => {
 
 // Shell & Utilities
 ipcMain.handle('shell:open-external', (event, url) => {
-  if (url) {
+  if (typeof url === 'string' && url.trim()) {
     try {
-      const parsedUrl = new URL(url);
-      if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:' || parsedUrl.protocol === 'mailto:') {
+      const parsedUrl = new URL(url.trim());
+      const protocol = parsedUrl.protocol.toLowerCase();
+      if (protocol === 'http:' || protocol === 'https:') {
+        if (parsedUrl.hostname) {
+          shell.openExternal(parsedUrl.href);
+        }
+      } else if (protocol === 'mailto:') {
         shell.openExternal(parsedUrl.href);
       }
     } catch {

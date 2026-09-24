@@ -14,7 +14,9 @@ jest.mock('electron', () => ({
     on: jest.fn()
   },
   dialog: jest.fn(),
-  shell: jest.fn(),
+  shell: {
+    openExternal: jest.fn()
+  },
   Menu: {
     buildFromTemplate: jest.fn(),
     setApplicationMenu: jest.fn()
@@ -42,7 +44,11 @@ jest.mock('./file-watcher', () => {
 
 const fs = require('fs');
 const path = require('path');
+const { ipcMain, shell } = require('electron');
 const { parseCommandLineArgs, addAllowedPath, allowedPaths, isPathAllowed, _clearAllowedPaths } = require('./main');
+
+// Get handlers registered during module import before jest.clearAllMocks clears calls
+const openExternalHandler = ipcMain.handle.mock.calls.find(call => call[0] === 'shell:open-external')?.[1];
 
 describe('parseCommandLineArgs', () => {
   let originalPlatform;
@@ -59,7 +65,6 @@ describe('parseCommandLineArgs', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.restoreAllMocks();
     // Default existsSync to return false, explicitly mock true for files we want to "exist"
     jest.spyOn(fs, 'existsSync').mockImplementation(() => false);
     jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -309,5 +314,64 @@ describe('isPathAllowed', () => {
     } finally {
       path.resolve = originalResolve;
     }
+  });
+});
+
+describe('shell:open-external handler', () => {
+  beforeEach(() => {
+    shell.openExternal.mockClear();
+  });
+
+  it('should open valid http and https URLs', () => {
+    openExternalHandler(null, 'http://example.com');
+    expect(shell.openExternal).toHaveBeenCalledWith('http://example.com/');
+
+    openExternalHandler(null, 'https://example.com/path?query=1#hash');
+    expect(shell.openExternal).toHaveBeenCalledWith('https://example.com/path?query=1#hash');
+  });
+
+  it('should open valid mailto URLs', () => {
+    openExternalHandler(null, 'mailto:test@example.com');
+    expect(shell.openExternal).toHaveBeenCalledWith('mailto:test@example.com');
+  });
+
+  it('should trim surrounding whitespace from URL', () => {
+    openExternalHandler(null, '  https://google.com  ');
+    expect(shell.openExternal).toHaveBeenCalledWith('https://google.com/');
+  });
+
+  it('should reject non-string inputs', () => {
+    openExternalHandler(null, null);
+    openExternalHandler(null, undefined);
+    openExternalHandler(null, 12345);
+    openExternalHandler(null, { url: 'http://example.com' });
+    openExternalHandler(null, ['http://example.com']);
+    expect(shell.openExternal).not.toHaveBeenCalled();
+  });
+
+  it('should reject empty or whitespace-only strings', () => {
+    openExternalHandler(null, '');
+    openExternalHandler(null, '   ');
+    expect(shell.openExternal).not.toHaveBeenCalled();
+  });
+
+  it('should reject unsafe protocols (file, javascript, data, shell, etc.)', () => {
+    openExternalHandler(null, 'file:///etc/passwd');
+    openExternalHandler(null, 'javascript:alert(1)');
+    openExternalHandler(null, 'data:text/html,<script>alert(1)</script>');
+    openExternalHandler(null, 'gopher://example.com');
+    openExternalHandler(null, 'ftp://example.com');
+    expect(shell.openExternal).not.toHaveBeenCalled();
+  });
+
+  it('should reject http/https URLs without a hostname', () => {
+    openExternalHandler(null, 'http:');
+    openExternalHandler(null, 'https://');
+    expect(shell.openExternal).not.toHaveBeenCalled();
+  });
+
+  it('should handle malformed URLs gracefully without throwing', () => {
+    expect(() => openExternalHandler(null, 'ht%7ttp://invalid-url')).not.toThrow();
+    expect(shell.openExternal).not.toHaveBeenCalled();
   });
 });
