@@ -765,11 +765,16 @@ ipcMain.handle('app:get-initial-targets', () => {
 });
 
 // Allow user dropped path
-ipcMain.handle('app:allow-dropped-path', (event, targetPath) => {
-  if (targetPath && typeof targetPath === 'string' && fs.existsSync(targetPath)) {
-    addAllowedPath(targetPath);
-    addAllowedPath(path.dirname(targetPath));
-    return true;
+ipcMain.handle('app:allow-dropped-path', async (event, targetPath) => {
+  if (targetPath && typeof targetPath === 'string') {
+    try {
+      await fs.promises.stat(targetPath);
+      addAllowedPath(targetPath);
+      addAllowedPath(path.dirname(targetPath));
+      return true;
+    } catch {
+      return false;
+    }
   }
   return false;
 });
