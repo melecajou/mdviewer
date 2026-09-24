@@ -72,7 +72,8 @@ describe('parseCommandLineArgs', () => {
     expect(parseCommandLineArgs('string')).toEqual([]);
   });
 
-  it('should ignore null, undefined, and non-string arguments', () => {
+  it('should ignore null, undefined, empty string, and non-string arguments', () => {
+    expect(parseCommandLineArgs([''])).toEqual([]);
     expect(parseCommandLineArgs([null, undefined, 123, {}, []])).toEqual([]);
   });
 
