@@ -1372,12 +1372,33 @@ class MDViewerExtensionApp extends MDViewerBase {
 
     nodes.forEach(textNode => {
       const text = textNode.nodeValue;
-      let match;
-      if (regex.test(text)) {
-        const span = document.createElement('span');
-        span.innerHTML = text.replace(regex, (m) => `<mark class="find-match">${m}</mark>`);
-        textNode.replaceWith(span);
-        span.querySelectorAll('.find-match').forEach(m => this.findMatches.push(m));
+      const matches = [...text.matchAll(regex)];
+      if (matches.length > 0) {
+        const frag = document.createDocumentFragment();
+        let lastIndex = 0;
+
+        matches.forEach(match => {
+          const matchStart = match.index;
+          const matchEnd = matchStart + match[0].length;
+
+          if (matchStart > lastIndex) {
+            frag.appendChild(document.createTextNode(text.substring(lastIndex, matchStart)));
+          }
+
+          const mark = document.createElement('mark');
+          mark.className = 'find-match';
+          mark.textContent = match[0];
+          frag.appendChild(mark);
+          this.findMatches.push(mark);
+
+          lastIndex = matchEnd;
+        });
+
+        if (lastIndex < text.length) {
+          frag.appendChild(document.createTextNode(text.substring(lastIndex)));
+        }
+
+        textNode.replaceWith(frag);
       }
     });
 
