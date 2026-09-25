@@ -86,8 +86,8 @@ class MDViewerExtensionApp extends MDViewerBase {
     this.findBar = document.getElementById('find-bar');
     this.findInput = document.getElementById('find-input');
     this.findCount = document.getElementById('find-count');
-    this.findPrev = document.getElementById('find-prev');
-    this.findNext = document.getElementById('find-next');
+    this.btnFindPrev = document.getElementById('find-prev');
+    this.btnFindNext = document.getElementById('find-next');
     this.findClose = document.getElementById('find-close');
 
     // Status Bar
@@ -312,8 +312,8 @@ class MDViewerExtensionApp extends MDViewerBase {
         }
       });
     }
-    if (this.findNext) this.findNext.addEventListener('click', () => this.findNext());
-    if (this.findPrev) this.findPrev.addEventListener('click', () => this.findPrevious());
+    if (this.btnFindNext) this.btnFindNext.addEventListener('click', () => this.findNext());
+    if (this.btnFindPrev) this.btnFindPrev.addEventListener('click', () => this.findPrevious());
     if (this.findClose) this.findClose.addEventListener('click', () => this.closeFindBar());
 
     // Modals
