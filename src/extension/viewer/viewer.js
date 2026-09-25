@@ -86,8 +86,8 @@ class MDViewerExtensionApp extends MDViewerBase {
     this.findBar = document.getElementById('find-bar');
     this.findInput = document.getElementById('find-input');
     this.findCount = document.getElementById('find-count');
-    this.findPrev = document.getElementById('find-prev');
-    this.findNext = document.getElementById('find-next');
+    this.btnFindPrev = document.getElementById('find-prev');
+    this.btnFindNext = document.getElementById('find-next');
     this.findClose = document.getElementById('find-close');
 
     // Status Bar
@@ -152,21 +152,70 @@ class MDViewerExtensionApp extends MDViewerBase {
   }
 
   bindEvents() {
+    this.setupSidebarEvents();
+    this.setupFileAndToolbarEvents();
+    this.setupEditorAndScrollEvents();
+    this.setupViewAndThemeEvents();
+    this.setupFindAndModalEvents();
+    this.setupDragAndDropEvents();
+    this.setupKeyboardAndWindowEvents();
+  }
+
+  setupSidebarEvents() {
     // Sidebar toggle
-    this.btnToggleSidebar.addEventListener('click', () => this.toggleSidebar());
+    if (this.btnToggleSidebar) {
+      this.btnToggleSidebar.addEventListener('click', () => this.toggleSidebar());
+    }
     
     // Sidebar tabs
-    this.sidebarTabBtns.forEach(btn => {
-      btn.addEventListener('click', () => this.switchSidebarTab(btn.dataset.tab));
-    });
+    if (this.sidebarTabBtns) {
+      this.sidebarTabBtns.forEach(btn => {
+        btn.addEventListener('click', () => this.switchSidebarTab(btn.dataset.tab));
+      });
+    }
 
+    // Folder Open buttons & search
+    if (this.btnOpenFolder) {
+      this.btnOpenFolder.addEventListener('click', () => this.handleOpenFolder());
+    }
+    if (this.btnSidebarOpenFolder) {
+      this.btnSidebarOpenFolder.addEventListener('click', () => this.handleOpenFolder());
+    }
+    if (this.explorerSearch) {
+      this.explorerSearch.addEventListener('input', (e) => this.filterFileTree(e.target.value));
+    }
+    if (this.hiddenFolderInput) {
+      this.hiddenFolderInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files).filter(f =>
+          f.name.endsWith('.md') || f.name.endsWith('.markdown') || f.name.endsWith('.mdown') || f.name.endsWith('.txt')
+        );
+        if (files.length > 0) {
+          const folderName = files[0].webkitRelativePath.split('/')[0] || 'Pasta';
+          this.renderFileListInExplorer(folderName, files);
+        }
+        this.hiddenFolderInput.value = '';
+      });
+    }
+  }
+
+  setupFileAndToolbarEvents() {
     // File New, Open & Save buttons
     if (this.btnNewFile) this.btnNewFile.addEventListener('click', () => this.handleNewFile());
-    this.btnOpenFile.addEventListener('click', () => this.handleOpenFile());
+    if (this.btnOpenFile) this.btnOpenFile.addEventListener('click', () => this.handleOpenFile());
     if (this.btnSaveFile) this.btnSaveFile.addEventListener('click', () => this.handleSaveFile());
-    this.btnTabAdd.addEventListener('click', () => this.handleOpenFile());
-    this.btnWelcomeOpenFile.addEventListener('click', () => this.handleOpenFile());
-    this.btnWelcomeSample.addEventListener('click', () => this.openSampleDocument());
+    if (this.btnTabAdd) this.btnTabAdd.addEventListener('click', () => this.handleOpenFile());
+    if (this.btnWelcomeOpenFile) this.btnWelcomeOpenFile.addEventListener('click', () => this.handleOpenFile());
+    if (this.btnWelcomeSample) this.btnWelcomeSample.addEventListener('click', () => this.openSampleDocument());
+    if (this.btnReload) this.btnReload.addEventListener('click', () => this.reloadActiveTab());
+
+    // Hidden input change
+    if (this.hiddenFileInput) {
+      this.hiddenFileInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files);
+        files.forEach(f => this.readFileObject(f));
+        this.hiddenFileInput.value = '';
+      });
+    }
 
     // Formatting Toolbar buttons
     if (this.btnFmtBold) this.btnFmtBold.addEventListener('click', () => this.formatWrap('**', '**', 'negrito'));
@@ -183,124 +232,126 @@ class MDViewerExtensionApp extends MDViewerBase {
     if (this.btnFmtImage) this.btnFmtImage.addEventListener('click', () => this.formatImage());
     if (this.btnFmtTable) this.btnFmtTable.addEventListener('click', () => this.formatTable());
 
+    // Export dropdown
+    if (this.btnExportToggle) {
+      this.btnExportToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.exportDropdown) this.exportDropdown.classList.toggle('open');
+      });
+    }
+    document.addEventListener('click', () => {
+      if (this.exportDropdown) this.exportDropdown.classList.remove('open');
+    });
+
+    if (this.menuExportPdf) this.menuExportPdf.addEventListener('click', () => this.exportToPdf());
+    if (this.menuExportHtml) this.menuExportHtml.addEventListener('click', () => this.exportToHtml());
+  }
+
+  setupEditorAndScrollEvents() {
     // Editor Textarea Events
-    this.sourceTextarea.addEventListener('input', () => this.handleEditorInput());
-    this.sourceTextarea.addEventListener('keydown', (e) => this.handleEditorKeydown(e));
+    if (this.sourceTextarea) {
+      this.sourceTextarea.addEventListener('input', () => this.handleEditorInput());
+      this.sourceTextarea.addEventListener('keydown', (e) => this.handleEditorKeydown(e));
 
-    // Synchronized Scrolling in Split Mode
-    this.sourceTextarea.addEventListener('scroll', () => {
-      if (this.viewMode !== 'split' || this.isSyncingScroll) return;
-      this.isSyncingScroll = true;
-      const maxTextarea = this.sourceTextarea.scrollHeight - this.sourceTextarea.clientHeight;
-      const maxPreview = this.previewPane.scrollHeight - this.previewPane.clientHeight;
-      if (maxTextarea > 0 && maxPreview > 0) {
-        const pct = this.sourceTextarea.scrollTop / maxTextarea;
-        this.previewPane.scrollTop = pct * maxPreview;
-      }
-      setTimeout(() => { this.isSyncingScroll = false; }, 40);
-    });
+      // Synchronized Scrolling in Split Mode
+      this.sourceTextarea.addEventListener('scroll', () => {
+        if (this.viewMode !== 'split' || this.isSyncingScroll) return;
+        this.isSyncingScroll = true;
+        const maxTextarea = this.sourceTextarea.scrollHeight - this.sourceTextarea.clientHeight;
+        const maxPreview = this.previewPane ? this.previewPane.scrollHeight - this.previewPane.clientHeight : 0;
+        if (maxTextarea > 0 && maxPreview > 0) {
+          const pct = this.sourceTextarea.scrollTop / maxTextarea;
+          this.previewPane.scrollTop = pct * maxPreview;
+        }
+        setTimeout(() => { this.isSyncingScroll = false; }, 40);
+      });
+    }
 
-    this.previewPane.addEventListener('scroll', () => {
-      if (this.viewMode !== 'split' || this.isSyncingScroll) return;
-      this.isSyncingScroll = true;
-      const maxTextarea = this.sourceTextarea.scrollHeight - this.sourceTextarea.clientHeight;
-      const maxPreview = this.previewPane.scrollHeight - this.previewPane.clientHeight;
-      if (maxTextarea > 0 && maxPreview > 0) {
-        const pct = this.previewPane.scrollTop / maxPreview;
-        this.sourceTextarea.scrollTop = pct * maxTextarea;
-      }
-      setTimeout(() => { this.isSyncingScroll = false; }, 40);
-    });
+    if (this.previewPane) {
+      this.previewPane.addEventListener('scroll', () => {
+        if (this.viewMode !== 'split' || this.isSyncingScroll) return;
+        this.isSyncingScroll = true;
+        const maxTextarea = this.sourceTextarea ? this.sourceTextarea.scrollHeight - this.sourceTextarea.clientHeight : 0;
+        const maxPreview = this.previewPane.scrollHeight - this.previewPane.clientHeight;
+        if (maxTextarea > 0 && maxPreview > 0) {
+          const pct = this.previewPane.scrollTop / maxPreview;
+          this.sourceTextarea.scrollTop = pct * maxTextarea;
+        }
+        setTimeout(() => { this.isSyncingScroll = false; }, 40);
+      });
+    }
+  }
 
-    // Hidden input change
-    this.hiddenFileInput.addEventListener('change', (e) => {
-      const files = Array.from(e.target.files);
-      files.forEach(f => this.readFileObject(f));
-      this.hiddenFileInput.value = '';
-    });
-
-    // Folder Open buttons
-    this.btnOpenFolder.addEventListener('click', () => this.handleOpenFolder());
-    this.btnSidebarOpenFolder.addEventListener('click', () => this.handleOpenFolder());
-    this.explorerSearch.addEventListener('input', (e) => this.filterFileTree(e.target.value));
-
-    this.hiddenFolderInput.addEventListener('change', (e) => {
-      const files = Array.from(e.target.files).filter(f => 
-        f.name.endsWith('.md') || f.name.endsWith('.markdown') || f.name.endsWith('.mdown') || f.name.endsWith('.txt')
-      );
-      if (files.length > 0) {
-        const folderName = files[0].webkitRelativePath.split('/')[0] || 'Pasta';
-        this.renderFileListInExplorer(folderName, files);
-      }
-      this.hiddenFolderInput.value = '';
-    });
-
-    // Reload button
-    this.btnReload.addEventListener('click', () => this.reloadActiveTab());
-
+  setupViewAndThemeEvents() {
     // View Mode buttons
-    this.btnViewPreview.addEventListener('click', () => this.setViewMode('preview'));
-    this.btnViewSplit.addEventListener('click', () => this.setViewMode('split'));
-    this.btnViewSource.addEventListener('click', () => this.setViewMode('source'));
+    if (this.btnViewPreview) this.btnViewPreview.addEventListener('click', () => this.setViewMode('preview'));
+    if (this.btnViewSplit) this.btnViewSplit.addEventListener('click', () => this.setViewMode('split'));
+    if (this.btnViewSource) this.btnViewSource.addEventListener('click', () => this.setViewMode('source'));
 
     // Zoom buttons
-    this.btnZoomIn.addEventListener('click', () => this.changeZoom(0.1));
-    this.btnZoomOut.addEventListener('click', () => this.changeZoom(-0.1));
-    this.btnZoomReset.addEventListener('click', () => this.resetZoom());
+    if (this.btnZoomIn) this.btnZoomIn.addEventListener('click', () => this.changeZoom(0.1));
+    if (this.btnZoomOut) this.btnZoomOut.addEventListener('click', () => this.changeZoom(-0.1));
+    if (this.btnZoomReset) this.btnZoomReset.addEventListener('click', () => this.resetZoom());
 
     // Theme selector
-    this.themeSelector.addEventListener('change', (e) => this.setTheme(e.target.value));
+    if (this.themeSelector) {
+      this.themeSelector.addEventListener('change', (e) => this.setTheme(e.target.value));
+    }
+  }
 
-    // Export dropdown
-    this.btnExportToggle.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.exportDropdown.classList.toggle('open');
-    });
-    document.addEventListener('click', () => this.exportDropdown.classList.remove('open'));
-
-    this.menuExportPdf.addEventListener('click', () => this.exportToPdf());
-    this.menuExportHtml.addEventListener('click', () => this.exportToHtml());
-
+  setupFindAndModalEvents() {
     // Find Bar
-    this.btnFind.addEventListener('click', () => this.openFindBar());
-    this.findInput.addEventListener('input', (e) => this.performFind(e.target.value));
-    this.findInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.shiftKey ? this.findPrevious() : this.findNext();
-      } else if (e.key === 'Escape') {
-        this.closeFindBar();
-      }
-    });
-    this.findNext.addEventListener('click', () => this.findNext());
-    this.findPrev.addEventListener('click', () => this.findPrevious());
-    this.findClose.addEventListener('click', () => this.closeFindBar());
+    if (this.btnFind) this.btnFind.addEventListener('click', () => this.openFindBar());
+    if (this.findInput) {
+      this.findInput.addEventListener('input', (e) => this.performFind(e.target.value));
+      this.findInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.shiftKey ? this.findPrevious() : this.findNext();
+        } else if (e.key === 'Escape') {
+          this.closeFindBar();
+        }
+      });
+    }
+    if (this.btnFindNext) this.btnFindNext.addEventListener('click', () => this.findNext());
+    if (this.btnFindPrev) this.btnFindPrev.addEventListener('click', () => this.findPrevious());
+    if (this.findClose) this.findClose.addEventListener('click', () => this.closeFindBar());
 
     // Modals
-    this.btnCloseShortcuts.addEventListener('click', () => this.shortcutsModal.classList.remove('visible'));
-    this.shortcutsModal.addEventListener('click', (e) => {
-      if (e.target === this.shortcutsModal) this.shortcutsModal.classList.remove('visible');
-    });
+    if (this.btnCloseShortcuts) {
+      this.btnCloseShortcuts.addEventListener('click', () => this.shortcutsModal.classList.remove('visible'));
+    }
+    if (this.shortcutsModal) {
+      this.shortcutsModal.addEventListener('click', (e) => {
+        if (e.target === this.shortcutsModal) this.shortcutsModal.classList.remove('visible');
+      });
+    }
 
-    this.lightboxClose.addEventListener('click', () => this.lightboxModal.classList.remove('visible'));
-    this.lightboxModal.addEventListener('click', (e) => {
-      if (e.target === this.lightboxModal) this.lightboxModal.classList.remove('visible');
-    });
+    if (this.lightboxClose) {
+      this.lightboxClose.addEventListener('click', () => this.lightboxModal.classList.remove('visible'));
+    }
+    if (this.lightboxModal) {
+      this.lightboxModal.addEventListener('click', (e) => {
+        if (e.target === this.lightboxModal) this.lightboxModal.classList.remove('visible');
+      });
+    }
+  }
 
+  setupDragAndDropEvents() {
     // Drag & Drop
     window.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      this.welcomeDropzone.classList.add('drag-over');
+      if (this.welcomeDropzone) this.welcomeDropzone.classList.add('drag-over');
     });
     window.addEventListener('dragleave', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      this.welcomeDropzone.classList.remove('drag-over');
+      if (this.welcomeDropzone) this.welcomeDropzone.classList.remove('drag-over');
     });
     window.addEventListener('drop', async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      this.welcomeDropzone.classList.remove('drag-over');
+      if (this.welcomeDropzone) this.welcomeDropzone.classList.remove('drag-over');
       if (e.dataTransfer && e.dataTransfer.files.length > 0) {
         for (let i = 0; i < e.dataTransfer.files.length; i++) {
           const file = e.dataTransfer.files[i];
@@ -308,28 +359,9 @@ class MDViewerExtensionApp extends MDViewerBase {
         }
       }
     });
+  }
 
-    // Synchronized scroll in Split View
-    let isSyncingSource = false;
-    let isSyncingPreview = false;
-    this.sourceTextarea.addEventListener('scroll', () => {
-      if (this.viewMode === 'split' && !isSyncingPreview) {
-        isSyncingSource = true;
-        const percentage = this.sourceTextarea.scrollTop / (this.sourceTextarea.scrollHeight - this.sourceTextarea.clientHeight);
-        this.previewPane.scrollTop = percentage * (this.previewPane.scrollHeight - this.previewPane.clientHeight);
-        setTimeout(() => { isSyncingSource = false; }, 50);
-      }
-    });
-
-    this.previewPane.addEventListener('scroll', () => {
-      if (this.viewMode === 'split' && !isSyncingSource) {
-        isSyncingPreview = true;
-        const percentage = this.previewPane.scrollTop / (this.previewPane.scrollHeight - this.previewPane.clientHeight);
-        this.sourceTextarea.scrollTop = percentage * (this.sourceTextarea.scrollHeight - this.sourceTextarea.clientHeight);
-        setTimeout(() => { isSyncingPreview = false; }, 50);
-      }
-    });
-
+  setupKeyboardAndWindowEvents() {
     // Teclas de atalho globais
     document.addEventListener('keydown', (e) => {
       const isCmdOrCtrl = e.ctrlKey || e.metaKey;
@@ -385,7 +417,7 @@ class MDViewerExtensionApp extends MDViewerBase {
         this.resetZoom();
       } else if (e.key === 'F1') {
         e.preventDefault();
-        this.shortcutsModal.classList.add('visible');
+        if (this.shortcutsModal) this.shortcutsModal.classList.add('visible');
       }
     });
 
@@ -507,22 +539,20 @@ class MDViewerExtensionApp extends MDViewerBase {
 
   renderFileListInExplorer(folderName, files) {
     const root = { name: folderName, isDirectory: true, children: [] };
+    const folderMap = new Map();
 
     for (const file of files) {
       const rel = file.webkitRelativePath || file.name;
       const parts = rel.split('/');
       const startIndex = (parts.length > 1 && parts[0] === folderName) ? 1 : 0;
-      const prefixOffset = (startIndex === 1) ? parts[0].length + 1 : 0;
 
       let currentLevel = root.children;
-      let currentEnd = prefixOffset;
+      let accumulated = '';
 
       for (let i = startIndex; i < parts.length; i++) {
         const part = parts[i];
         const isFile = (i === parts.length - 1);
-        currentEnd += part.length;
-        const accumulated = rel.substring(prefixOffset, currentEnd);
-        currentEnd += 1;
+        accumulated = accumulated ? accumulated + '/' + part : part;
 
         if (isFile) {
           currentLevel.push({
@@ -534,7 +564,7 @@ class MDViewerExtensionApp extends MDViewerBase {
             fileObject: file
           });
         } else {
-          let folder = currentLevel.find(item => item.isDirectory && item.name === part);
+          let folder = folderMap.get(accumulated);
           if (!folder) {
             folder = {
               name: part,
@@ -544,6 +574,7 @@ class MDViewerExtensionApp extends MDViewerBase {
               children: []
             };
             currentLevel.push(folder);
+            folderMap.set(accumulated, folder);
           }
           currentLevel = folder.children;
         }
@@ -1372,16 +1403,38 @@ class MDViewerExtensionApp extends MDViewerBase {
     }
 
     this.findMatches = [];
-    const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'gi');
 
     nodes.forEach(textNode => {
       const text = textNode.nodeValue;
-      let match;
-      if (regex.test(text)) {
-        const span = document.createElement('span');
-        span.innerHTML = text.replace(regex, (m) => `<mark class="find-match">${m}</mark>`);
-        textNode.replaceWith(span);
-        span.querySelectorAll('.find-match').forEach(m => this.findMatches.push(m));
+      const matches = Array.from(text.matchAll(regex));
+      if (matches.length > 0) {
+        const frag = document.createDocumentFragment();
+        let lastIndex = 0;
+
+        matches.forEach(match => {
+          const matchStart = match.index;
+          const matchLength = match[0].length;
+
+          if (matchStart > lastIndex) {
+            frag.appendChild(document.createTextNode(text.substring(lastIndex, matchStart)));
+          }
+
+          const mark = document.createElement('mark');
+          mark.className = 'find-match';
+          mark.textContent = match[0];
+          frag.appendChild(mark);
+          this.findMatches.push(mark);
+
+          lastIndex = matchStart + matchLength;
+        });
+
+        if (lastIndex < text.length) {
+          frag.appendChild(document.createTextNode(text.substring(lastIndex)));
+        }
+
+        textNode.replaceWith(frag);
       }
     });
 
@@ -1502,3 +1555,7 @@ Equação em linha: $E = mc^2$.
 window.addEventListener('DOMContentLoaded', () => {
   window.mdViewerApp = new MDViewerExtensionApp();
 });
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = MDViewerExtensionApp;
+}

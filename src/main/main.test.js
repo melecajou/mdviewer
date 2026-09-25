@@ -14,7 +14,10 @@ jest.mock('electron', () => ({
     on: jest.fn()
   },
   dialog: jest.fn(),
-  shell: jest.fn(),
+  shell: {
+    showItemInFolder: jest.fn(),
+    openExternal: jest.fn()
+  },
   Menu: {
     buildFromTemplate: jest.fn(),
     setApplicationMenu: jest.fn()
@@ -42,7 +45,12 @@ jest.mock('./file-watcher', () => {
 
 const fs = require('fs');
 const path = require('path');
-const { parseCommandLineArgs, addAllowedPath, allowedPaths, isPathAllowed, _clearAllowedPaths } = require('./main');
+const { ipcMain, shell } = require('electron');
+const { parseCommandLineArgs, addAllowedPath, allowedPaths, isPathAllowed, isSystemOrRootDirectory, _clearAllowedPaths } = require('./main');
+
+const ipcMainHandlers = new Map(ipcMain.handle.mock.calls);
+const openExternalHandler = ipcMainHandlers.get('shell:open-external');
+const allowDroppedPathHandler = ipcMainHandlers.get('app:allow-dropped-path');
 
 describe('parseCommandLineArgs', () => {
   let originalPlatform;
@@ -59,7 +67,6 @@ describe('parseCommandLineArgs', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.restoreAllMocks();
     // Default existsSync to return false, explicitly mock true for files we want to "exist"
     jest.spyOn(fs, 'existsSync').mockImplementation(() => false);
     jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -72,7 +79,8 @@ describe('parseCommandLineArgs', () => {
     expect(parseCommandLineArgs('string')).toEqual([]);
   });
 
-  it('should ignore null, undefined, and non-string arguments', () => {
+  it('should ignore null, undefined, empty string, and non-string arguments', () => {
+    expect(parseCommandLineArgs([''])).toEqual([]);
     expect(parseCommandLineArgs([null, undefined, 123, {}, []])).toEqual([]);
   });
 
@@ -309,5 +317,253 @@ describe('isPathAllowed', () => {
     } finally {
       path.resolve = originalResolve;
     }
+  });
+});
+
+describe('isSystemOrRootDirectory', () => {
+  it('should return true for root directory', () => {
+    const rootDir = path.parse(process.cwd()).root;
+    expect(isSystemOrRootDirectory(rootDir)).toBe(true);
+  });
+
+  it('should return true for sensitive POSIX system directories', () => {
+    expect(isSystemOrRootDirectory('/etc')).toBe(true);
+    expect(isSystemOrRootDirectory('/etc/passwd')).toBe(true);
+    expect(isSystemOrRootDirectory('/bin')).toBe(true);
+    expect(isSystemOrRootDirectory('/usr/bin')).toBe(true);
+  });
+
+  it('should return false for standard non-system directories', () => {
+    const safeDir = path.resolve('/home/user/documents');
+    expect(isSystemOrRootDirectory(safeDir)).toBe(false);
+  });
+
+  it('should return true for invalid or non-string inputs', () => {
+    expect(isSystemOrRootDirectory(null)).toBe(true);
+    expect(isSystemOrRootDirectory(undefined)).toBe(true);
+    expect(isSystemOrRootDirectory(123)).toBe(true);
+  });
+});
+
+describe('shell:open-external handler', () => {
+  beforeEach(() => {
+    shell.openExternal.mockClear();
+  });
+
+  it('should open valid http and https URLs', () => {
+    openExternalHandler(null, 'http://example.com');
+    expect(shell.openExternal).toHaveBeenCalledWith('http://example.com/');
+
+    openExternalHandler(null, 'https://example.com/path?query=1#hash');
+    expect(shell.openExternal).toHaveBeenCalledWith('https://example.com/path?query=1#hash');
+  });
+
+  it('should open valid mailto URLs', () => {
+    openExternalHandler(null, 'mailto:test@example.com');
+    expect(shell.openExternal).toHaveBeenCalledWith('mailto:test@example.com');
+  });
+
+  it('should trim surrounding whitespace from URL', () => {
+    openExternalHandler(null, '  https://google.com  ');
+    expect(shell.openExternal).toHaveBeenCalledWith('https://google.com/');
+  });
+
+  it('should reject non-string inputs', () => {
+    openExternalHandler(null, null);
+    openExternalHandler(null, undefined);
+    openExternalHandler(null, 12345);
+    openExternalHandler(null, { url: 'http://example.com' });
+    openExternalHandler(null, ['http://example.com']);
+    expect(shell.openExternal).not.toHaveBeenCalled();
+  });
+
+  it('should reject empty or whitespace-only strings', () => {
+    openExternalHandler(null, '');
+    openExternalHandler(null, '   ');
+    expect(shell.openExternal).not.toHaveBeenCalled();
+  });
+
+  it('should reject unsafe protocols (file, javascript, data, shell, etc.)', () => {
+    openExternalHandler(null, 'file:///etc/passwd');
+    openExternalHandler(null, 'javascript:alert(1)');
+    openExternalHandler(null, 'data:text/html,<script>alert(1)</script>');
+    openExternalHandler(null, 'gopher://example.com');
+    openExternalHandler(null, 'ftp://example.com');
+    expect(shell.openExternal).not.toHaveBeenCalled();
+  });
+
+  it('should reject http/https URLs without a hostname', () => {
+    openExternalHandler(null, 'http:');
+    openExternalHandler(null, 'https://');
+    expect(shell.openExternal).not.toHaveBeenCalled();
+  });
+
+  it('should handle malformed URLs gracefully without throwing', () => {
+    expect(() => openExternalHandler(null, 'ht%7ttp://invalid-url')).not.toThrow();
+    expect(shell.openExternal).not.toHaveBeenCalled();
+  });
+});
+
+describe('shell:show-in-folder IPC handler', () => {
+  let showInFolderHandler;
+
+  beforeAll(() => {
+    showInFolderHandler = ipcMainHandlers.get('shell:show-in-folder');
+  });
+
+  beforeEach(() => {
+    _clearAllowedPaths();
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  it('should be registered with ipcMain', () => {
+    expect(showInFolderHandler).toBeDefined();
+    expect(typeof showInFolderHandler).toBe('function');
+  });
+
+  it('should call shell.showItemInFolder when filePath exists and is allowed', async () => {
+    const filePath = path.resolve('/test/allowed/file.md');
+    addAllowedPath(filePath);
+
+    jest.spyOn(fs.promises, 'access').mockResolvedValue(undefined);
+
+    const result = await showInFolderHandler({}, filePath);
+
+    expect(fs.promises.access).toHaveBeenCalledWith(filePath);
+    expect(shell.showItemInFolder).toHaveBeenCalledWith(filePath);
+    expect(result).toBe(true);
+  });
+
+  it('should not call shell.showItemInFolder if path is not allowed', async () => {
+    const filePath = path.resolve('/test/unallowed/file.md');
+    jest.spyOn(fs.promises, 'access').mockResolvedValue(undefined);
+
+    const result = await showInFolderHandler({}, filePath);
+
+    expect(fs.promises.access).not.toHaveBeenCalled();
+    expect(shell.showItemInFolder).not.toHaveBeenCalled();
+    expect(result).toBe(true);
+  });
+
+  it('should not call shell.showItemInFolder if file access fails (does not exist)', async () => {
+    const filePath = path.resolve('/test/allowed/nonexistent.md');
+    addAllowedPath(filePath);
+
+    jest.spyOn(fs.promises, 'access').mockRejectedValue(new Error('ENOENT'));
+
+    const result = await showInFolderHandler({}, filePath);
+
+    expect(fs.promises.access).toHaveBeenCalledWith(filePath);
+    expect(shell.showItemInFolder).not.toHaveBeenCalled();
+    expect(result).toBe(true);
+  });
+
+  it('should return true for falsy filePath', async () => {
+    const result = await showInFolderHandler({}, null);
+    expect(shell.showItemInFolder).not.toHaveBeenCalled();
+    expect(result).toBe(true);
+  });
+});
+
+describe('app:allow-dropped-path IPC handler', () => {
+  beforeEach(() => {
+    _clearAllowedPaths();
+    jest.clearAllMocks();
+  });
+
+  it('should return false if event or event.sender is invalid or destroyed', async () => {
+    expect(await allowDroppedPathHandler(null, '/path/file.md')).toBe(false);
+    expect(await allowDroppedPathHandler({}, '/path/file.md')).toBe(false);
+    expect(await allowDroppedPathHandler({ sender: { isDestroyed: () => true } }, '/path/file.md')).toBe(false);
+  });
+
+  it('should return false if targetPath is invalid or not string', async () => {
+    const validEvent = { sender: { isDestroyed: () => false } };
+    expect(await allowDroppedPathHandler(validEvent, null)).toBe(false);
+    expect(await allowDroppedPathHandler(validEvent, 123)).toBe(false);
+    expect(await allowDroppedPathHandler(validEvent, '')).toBe(false);
+  });
+
+  it('should return false if targetPath does not exist on disk', async () => {
+    const validEvent = { sender: { isDestroyed: () => false } };
+    jest.spyOn(fs.promises, 'stat').mockRejectedValue(new Error('ENOENT'));
+
+    const res = await allowDroppedPathHandler(validEvent, '/nonexistent/file.md');
+    expect(res).toBe(false);
+  });
+
+  it('should return false if targetPath is a non-markdown file (e.g., /etc/passwd or .exe)', async () => {
+    const validEvent = { sender: { isDestroyed: () => false } };
+    jest.spyOn(fs.promises, 'stat').mockResolvedValue({
+      isDirectory: () => false,
+      isFile: () => true
+    });
+
+    const resPasswd = await allowDroppedPathHandler(validEvent, '/etc/passwd');
+    expect(resPasswd).toBe(false);
+    expect(isPathAllowed('/etc/passwd')).toBe(false);
+
+    const resExe = await allowDroppedPathHandler(validEvent, '/home/user/app.exe');
+    expect(resExe).toBe(false);
+  });
+
+  it('should return false if targetPath is a system directory (e.g., /etc)', async () => {
+    const validEvent = { sender: { isDestroyed: () => false } };
+    jest.spyOn(fs.promises, 'stat').mockResolvedValue({
+      isDirectory: () => true,
+      isFile: () => false
+    });
+
+    const res = await allowDroppedPathHandler(validEvent, '/etc');
+    expect(res).toBe(false);
+    expect(isPathAllowed('/etc')).toBe(false);
+  });
+
+  it('should allow valid dropped markdown file and add file and non-system parent dir to allowedPaths', async () => {
+    const validEvent = { sender: { isDestroyed: () => false } };
+    const filePath = path.resolve('/home/user/notes/doc.md');
+    const parentDir = path.dirname(filePath);
+
+    jest.spyOn(fs.promises, 'stat').mockResolvedValue({
+      isDirectory: () => false,
+      isFile: () => true
+    });
+
+    const res = await allowDroppedPathHandler(validEvent, filePath);
+    expect(res).toBe(true);
+    expect(isPathAllowed(filePath)).toBe(true);
+    expect(isPathAllowed(parentDir)).toBe(true);
+  });
+
+  it('should allow valid markdown file in system dir but NOT add system parent dir to allowedPaths', async () => {
+    const validEvent = { sender: { isDestroyed: () => false } };
+    const filePath = path.resolve('/etc/notes.md');
+
+    jest.spyOn(fs.promises, 'stat').mockResolvedValue({
+      isDirectory: () => false,
+      isFile: () => true
+    });
+
+    const res = await allowDroppedPathHandler(validEvent, filePath);
+    expect(res).toBe(true);
+    expect(isPathAllowed(filePath)).toBe(true);
+    // /etc/passwd should NOT be allowed!
+    expect(isPathAllowed('/etc/passwd')).toBe(false);
+  });
+
+  it('should allow valid dropped non-system directory', async () => {
+    const validEvent = { sender: { isDestroyed: () => false } };
+    const dirPath = path.resolve('/home/user/my-notes');
+
+    jest.spyOn(fs.promises, 'stat').mockResolvedValue({
+      isDirectory: () => true,
+      isFile: () => false
+    });
+
+    const res = await allowDroppedPathHandler(validEvent, dirPath);
+    expect(res).toBe(true);
+    expect(isPathAllowed(dirPath)).toBe(true);
+    expect(isPathAllowed(path.join(dirPath, 'anyfile.md'))).toBe(true);
   });
 });

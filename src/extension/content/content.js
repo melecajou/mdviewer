@@ -155,6 +155,11 @@
       return;
     }
 
+    if (!window.DOMPurify || typeof window.DOMPurify.sanitize !== 'function') {
+      renderedContent.innerHTML = `<p>Erro: Biblioteca de sanitização (DOMPurify) não foi carregada. Renderização cancelada por segurança.</p>`;
+      return;
+    }
+
     const { html, headings } = window.MDViewerEngine.parseMarkdown(text);
 
     // Inject HTML (Sanitized to prevent XSS)

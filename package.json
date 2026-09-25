@@ -14,7 +14,12 @@
     "pack:win": "electron-builder --win --dir",
     "build:win": "electron-builder --win",
     "build:linux": "electron-builder --linux",
-    "test": "jest"
+    "test": "jest src/"
+  },
+  "jest": {
+    "testMatch": [
+      "<rootDir>/src/**/*.test.js"
+    ]
   },
   "keywords": [
     "markdown",
@@ -44,6 +49,15 @@
     "electron-builder": "^26.15.3",
     "jest": "^30.5.1",
     "jest-environment-jsdom": "^30.5.1"
+  },
+  "jest": {
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/"
+    ],
+    "modulePathIgnorePatterns": [
+      "<rootDir>/dist/"
+    ]
   },
   "build": {
     "appId": "com.mdviewer.app",
