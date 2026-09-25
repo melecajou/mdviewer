@@ -14,7 +14,10 @@ jest.mock('electron', () => ({
     on: jest.fn()
   },
   dialog: jest.fn(),
-  shell: jest.fn(),
+  shell: {
+    showItemInFolder: jest.fn(),
+    openExternal: jest.fn()
+  },
   Menu: {
     buildFromTemplate: jest.fn(),
     setApplicationMenu: jest.fn()
@@ -42,11 +45,12 @@ jest.mock('./file-watcher', () => {
 
 const fs = require('fs');
 const path = require('path');
-const { ipcMain } = require('electron');
+const { ipcMain, shell } = require('electron');
 const { parseCommandLineArgs, addAllowedPath, allowedPaths, isPathAllowed, isSystemOrRootDirectory, _clearAllowedPaths } = require('./main');
 
-const allowDroppedPathCall = ipcMain.handle.mock.calls.find(c => c[0] === 'app:allow-dropped-path');
-const allowDroppedPathHandler = allowDroppedPathCall ? allowDroppedPathCall[1] : null;
+const ipcMainHandlers = new Map(ipcMain.handle.mock.calls);
+const openExternalHandler = ipcMainHandlers.get('shell:open-external');
+const allowDroppedPathHandler = ipcMainHandlers.get('app:allow-dropped-path');
 
 describe('parseCommandLineArgs', () => {
   let originalPlatform;
@@ -63,7 +67,6 @@ describe('parseCommandLineArgs', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.restoreAllMocks();
     // Default existsSync to return false, explicitly mock true for files we want to "exist"
     jest.spyOn(fs, 'existsSync').mockImplementation(() => false);
     jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -76,7 +79,8 @@ describe('parseCommandLineArgs', () => {
     expect(parseCommandLineArgs('string')).toEqual([]);
   });
 
-  it('should ignore null, undefined, and non-string arguments', () => {
+  it('should ignore null, undefined, empty string, and non-string arguments', () => {
+    expect(parseCommandLineArgs([''])).toEqual([]);
     expect(parseCommandLineArgs([null, undefined, 123, {}, []])).toEqual([]);
   });
 
@@ -338,6 +342,127 @@ describe('isSystemOrRootDirectory', () => {
     expect(isSystemOrRootDirectory(null)).toBe(true);
     expect(isSystemOrRootDirectory(undefined)).toBe(true);
     expect(isSystemOrRootDirectory(123)).toBe(true);
+  });
+});
+
+describe('shell:open-external handler', () => {
+  beforeEach(() => {
+    shell.openExternal.mockClear();
+  });
+
+  it('should open valid http and https URLs', () => {
+    openExternalHandler(null, 'http://example.com');
+    expect(shell.openExternal).toHaveBeenCalledWith('http://example.com/');
+
+    openExternalHandler(null, 'https://example.com/path?query=1#hash');
+    expect(shell.openExternal).toHaveBeenCalledWith('https://example.com/path?query=1#hash');
+  });
+
+  it('should open valid mailto URLs', () => {
+    openExternalHandler(null, 'mailto:test@example.com');
+    expect(shell.openExternal).toHaveBeenCalledWith('mailto:test@example.com');
+  });
+
+  it('should trim surrounding whitespace from URL', () => {
+    openExternalHandler(null, '  https://google.com  ');
+    expect(shell.openExternal).toHaveBeenCalledWith('https://google.com/');
+  });
+
+  it('should reject non-string inputs', () => {
+    openExternalHandler(null, null);
+    openExternalHandler(null, undefined);
+    openExternalHandler(null, 12345);
+    openExternalHandler(null, { url: 'http://example.com' });
+    openExternalHandler(null, ['http://example.com']);
+    expect(shell.openExternal).not.toHaveBeenCalled();
+  });
+
+  it('should reject empty or whitespace-only strings', () => {
+    openExternalHandler(null, '');
+    openExternalHandler(null, '   ');
+    expect(shell.openExternal).not.toHaveBeenCalled();
+  });
+
+  it('should reject unsafe protocols (file, javascript, data, shell, etc.)', () => {
+    openExternalHandler(null, 'file:///etc/passwd');
+    openExternalHandler(null, 'javascript:alert(1)');
+    openExternalHandler(null, 'data:text/html,<script>alert(1)</script>');
+    openExternalHandler(null, 'gopher://example.com');
+    openExternalHandler(null, 'ftp://example.com');
+    expect(shell.openExternal).not.toHaveBeenCalled();
+  });
+
+  it('should reject http/https URLs without a hostname', () => {
+    openExternalHandler(null, 'http:');
+    openExternalHandler(null, 'https://');
+    expect(shell.openExternal).not.toHaveBeenCalled();
+  });
+
+  it('should handle malformed URLs gracefully without throwing', () => {
+    expect(() => openExternalHandler(null, 'ht%7ttp://invalid-url')).not.toThrow();
+    expect(shell.openExternal).not.toHaveBeenCalled();
+  });
+});
+
+describe('shell:show-in-folder IPC handler', () => {
+  let showInFolderHandler;
+
+  beforeAll(() => {
+    showInFolderHandler = ipcMainHandlers.get('shell:show-in-folder');
+  });
+
+  beforeEach(() => {
+    _clearAllowedPaths();
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  it('should be registered with ipcMain', () => {
+    expect(showInFolderHandler).toBeDefined();
+    expect(typeof showInFolderHandler).toBe('function');
+  });
+
+  it('should call shell.showItemInFolder when filePath exists and is allowed', async () => {
+    const filePath = path.resolve('/test/allowed/file.md');
+    addAllowedPath(filePath);
+
+    jest.spyOn(fs.promises, 'access').mockResolvedValue(undefined);
+
+    const result = await showInFolderHandler({}, filePath);
+
+    expect(fs.promises.access).toHaveBeenCalledWith(filePath);
+    expect(shell.showItemInFolder).toHaveBeenCalledWith(filePath);
+    expect(result).toBe(true);
+  });
+
+  it('should not call shell.showItemInFolder if path is not allowed', async () => {
+    const filePath = path.resolve('/test/unallowed/file.md');
+    jest.spyOn(fs.promises, 'access').mockResolvedValue(undefined);
+
+    const result = await showInFolderHandler({}, filePath);
+
+    expect(fs.promises.access).not.toHaveBeenCalled();
+    expect(shell.showItemInFolder).not.toHaveBeenCalled();
+    expect(result).toBe(true);
+  });
+
+  it('should not call shell.showItemInFolder if file access fails (does not exist)', async () => {
+    const filePath = path.resolve('/test/allowed/nonexistent.md');
+    addAllowedPath(filePath);
+
+    jest.spyOn(fs.promises, 'access').mockRejectedValue(new Error('ENOENT'));
+
+    const result = await showInFolderHandler({}, filePath);
+
+    expect(fs.promises.access).toHaveBeenCalledWith(filePath);
+    expect(shell.showItemInFolder).not.toHaveBeenCalled();
+    expect(result).toBe(true);
+  });
+
+  it('should return true for falsy filePath', async () => {
+    const result = await showInFolderHandler({}, null);
+    expect(shell.showItemInFolder).not.toHaveBeenCalled();
+    expect(result).toBe(true);
   });
 });
 

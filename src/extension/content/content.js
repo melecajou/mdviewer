@@ -155,12 +155,17 @@
       return;
     }
 
+    if (!window.DOMPurify || typeof window.DOMPurify.sanitize !== 'function') {
+      renderedContent.innerHTML = `<p>Erro: Biblioteca de sanitização (DOMPurify) não foi carregada. Renderização cancelada por segurança.</p>`;
+      return;
+    }
+
     const { html, headings } = window.MDViewerEngine.parseMarkdown(text);
 
     // Inject HTML (Sanitized to prevent XSS)
-    const sanitizedHtml = window.DOMPurify ? window.DOMPurify.sanitize(html, {
+    const sanitizedHtml = window.DOMPurify.sanitize(html, {
       USE_PROFILES: { html: true }
-    }) : html;
+    });
 
     renderedContent.innerHTML = sanitizedHtml;
     rawView.textContent = text;
