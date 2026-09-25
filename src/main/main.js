@@ -42,62 +42,71 @@ function isPathAllowed(p) {
 }
 
 
+function isIgnoredArg(arg) {
+  if (arg.startsWith('-')) return true;
+  return (
+    arg.endsWith('/electron') ||
+    arg.endsWith('\\electron.exe') ||
+    arg.endsWith('/electron.exe') ||
+    arg.endsWith('\\mdviewer.exe') ||
+    arg.endsWith('/mdviewer.exe') ||
+    arg === 'electron' ||
+    arg === 'mdviewer'
+  );
+}
+
+function normalizeCliArg(arg) {
+  if (!arg.startsWith('file://')) return arg;
+  try {
+    const parsedUrl = new URL(arg);
+    let pathname = decodeURIComponent(parsedUrl.pathname);
+    if (process.platform === 'win32') {
+      pathname = pathname.replace(/^\/([a-zA-Z]:)/, '$1');
+    }
+    return pathname;
+  } catch {
+    return arg.replace(/^file:\/\//, '');
+  }
+}
+
+function resolveCliTarget(arg, cwd, appPath, mainScriptPath) {
+  if (!arg || typeof arg !== 'string') return null;
+  if (isIgnoredArg(arg)) return null;
+
+  const normalized = normalizeCliArg(arg);
+
+  try {
+    const resolved = path.isAbsolute(normalized)
+      ? path.resolve(normalized)
+      : path.resolve(cwd, normalized);
+
+    if (resolved === appPath || resolved === mainScriptPath) {
+      return null;
+    }
+
+    if (fs.existsSync(resolved)) {
+      return resolved;
+    }
+  } catch (e) {
+    console.error('Error checking arg path:', e);
+  }
+
+  return null;
+}
+
 // Parse file/folder paths from command line arguments
 function parseCommandLineArgs(argv, cwd = process.cwd()) {
-  const targets = [];
-  if (!Array.isArray(argv)) return targets;
+  if (!Array.isArray(argv)) return [];
 
   const appPath = path.resolve(__dirname, '../..');
   const mainScriptPath = path.resolve(__dirname, 'main.js');
 
+  const targets = [];
   for (let i = 0; i < argv.length; i++) {
-    let arg = argv[i];
-    if (!arg || typeof arg !== 'string') continue;
-
-    // Skip flags (e.g. --ozone-platform, -r, etc.)
-    if (arg.startsWith('-')) continue;
-
-    // Skip electron or mdviewer binaries (Linux & Windows)
-    if (
-      arg.endsWith('/electron') ||
-      arg.endsWith('\\electron.exe') ||
-      arg.endsWith('/electron.exe') ||
-      arg.endsWith('\\mdviewer.exe') ||
-      arg.endsWith('/mdviewer.exe') ||
-      arg === 'electron' ||
-      arg === 'mdviewer'
-    ) {
-      continue;
-    }
-
-    // Handle file:// URIs (from file managers / freedesktop / Windows shell)
-    if (arg.startsWith('file://')) {
-      try {
-        const parsedUrl = new URL(arg);
-        arg = decodeURIComponent(parsedUrl.pathname);
-        if (process.platform === 'win32') {
-          arg = arg.replace(/^\/([a-zA-Z]:)/, '$1');
-        }
-      } catch {
-        arg = arg.replace(/^file:\/\//, '');
-      }
-    }
-
-    try {
-      const resolved = path.isAbsolute(arg) ? path.resolve(arg) : path.resolve(cwd, arg);
-
-      // Skip the app directory and main script
-      if (resolved === appPath || resolved === mainScriptPath) {
-        continue;
-      }
-
-      // Check if target exists on disk
-      if (fs.existsSync(resolved)) {
-        targets.push(resolved);
-        addAllowedPath(resolved);
-      }
-    } catch (e) {
-      console.error('Error checking arg path:', e);
+    const target = resolveCliTarget(argv[i], cwd, appPath, mainScriptPath);
+    if (target) {
+      targets.push(target);
+      addAllowedPath(target);
     }
   }
   return targets;
@@ -736,9 +745,14 @@ ipcMain.handle('shell:open-external', (event, url) => {
   return true;
 });
 
-ipcMain.handle('shell:show-in-folder', (event, filePath) => {
-  if (filePath && fs.existsSync(filePath) && isPathAllowed(filePath)) {
-    shell.showItemInFolder(filePath);
+ipcMain.handle('shell:show-in-folder', async (event, filePath) => {
+  if (filePath && isPathAllowed(filePath)) {
+    try {
+      await fs.promises.access(filePath);
+      shell.showItemInFolder(filePath);
+    } catch {
+      // File does not exist or inaccessible, ignore silently
+    }
   }
   return true;
 });
@@ -756,11 +770,16 @@ ipcMain.handle('app:get-initial-targets', () => {
 });
 
 // Allow user dropped path
-ipcMain.handle('app:allow-dropped-path', (event, targetPath) => {
-  if (targetPath && typeof targetPath === 'string' && fs.existsSync(targetPath)) {
-    addAllowedPath(targetPath);
-    addAllowedPath(path.dirname(targetPath));
-    return true;
+ipcMain.handle('app:allow-dropped-path', async (event, targetPath) => {
+  if (targetPath && typeof targetPath === 'string') {
+    try {
+      await fs.promises.stat(targetPath);
+      addAllowedPath(targetPath);
+      addAllowedPath(path.dirname(targetPath));
+      return true;
+    } catch {
+      return false;
+    }
   }
   return false;
 });

@@ -549,4 +549,62 @@ describe('MDViewerExtensionApp', () => {
       expect(tocBtn.classList.contains('active')).toBe(true);
     });
   });
+
+  describe('bindEvents & setup helper methods', () => {
+    it('should call all setup helper methods during bindEvents', () => {
+      const spySidebar = jest.spyOn(MDViewerExtensionApp.prototype, 'setupSidebarEvents').mockImplementation(() => {});
+      const spyFileToolbar = jest.spyOn(MDViewerExtensionApp.prototype, 'setupFileAndToolbarEvents').mockImplementation(() => {});
+      const spyEditorScroll = jest.spyOn(MDViewerExtensionApp.prototype, 'setupEditorAndScrollEvents').mockImplementation(() => {});
+      const spyViewTheme = jest.spyOn(MDViewerExtensionApp.prototype, 'setupViewAndThemeEvents').mockImplementation(() => {});
+      const spyFindModal = jest.spyOn(MDViewerExtensionApp.prototype, 'setupFindAndModalEvents').mockImplementation(() => {});
+      const spyDragDrop = jest.spyOn(MDViewerExtensionApp.prototype, 'setupDragAndDropEvents').mockImplementation(() => {});
+      const spyKeyboardWindow = jest.spyOn(MDViewerExtensionApp.prototype, 'setupKeyboardAndWindowEvents').mockImplementation(() => {});
+
+      // Instantiate app (which calls init -> cacheElements -> bindEvents)
+      app = new MDViewerExtensionApp();
+
+      expect(spySidebar).toHaveBeenCalled();
+      expect(spyFileToolbar).toHaveBeenCalled();
+      expect(spyEditorScroll).toHaveBeenCalled();
+      expect(spyViewTheme).toHaveBeenCalled();
+      expect(spyFindModal).toHaveBeenCalled();
+      expect(spyDragDrop).toHaveBeenCalled();
+      expect(spyKeyboardWindow).toHaveBeenCalled();
+
+      spySidebar.mockRestore();
+      spyFileToolbar.mockRestore();
+      spyEditorScroll.mockRestore();
+      spyViewTheme.mockRestore();
+      spyFindModal.mockRestore();
+      spyDragDrop.mockRestore();
+      spyKeyboardWindow.mockRestore();
+    });
+
+    it('setupSidebarEvents should attach click handler to btnToggleSidebar', () => {
+      const toggleSpy = jest.spyOn(app, 'toggleSidebar').mockImplementation(() => {});
+
+      app.btnToggleSidebar.click();
+      expect(toggleSpy).toHaveBeenCalled();
+    });
+
+    it('setupViewAndThemeEvents should attach click handlers to view mode buttons', () => {
+      const setViewModeSpy = jest.spyOn(app, 'setViewMode').mockImplementation(() => {});
+
+      app.btnViewPreview.click();
+      expect(setViewModeSpy).toHaveBeenCalledWith('preview');
+
+      app.btnViewSplit.click();
+      expect(setViewModeSpy).toHaveBeenCalledWith('split');
+
+      app.btnViewSource.click();
+      expect(setViewModeSpy).toHaveBeenCalledWith('source');
+    });
+
+    it('setupFileAndToolbarEvents should attach click handler to btnNewFile', () => {
+      const newFileSpy = jest.spyOn(app, 'handleNewFile').mockImplementation(() => {});
+
+      app.btnNewFile.click();
+      expect(newFileSpy).toHaveBeenCalled();
+    });
+  });
 });
