@@ -29,7 +29,7 @@ cp "$DIR/src/extension/assets/icon16.png" "$HOME/.local/share/icons/hicolor/16x1
 cp "$DIR/src/assets/icon.svg" "$HOME/.local/share/icons/hicolor/scalable/apps/mdviewer.svg"
 
 # Update absolute paths dynamically in the desktop file for the current user/directory
-sed -e "s|Exec=.*|Exec=$DIR/bin/mdviewer %F|" \
+sed -e "s|Exec=.*|Exec=\"$DIR/bin/mdviewer\" %F|" \
     -e "s|Icon=.*|Icon=$DIR/src/assets/icon.png|" \
     "$DIR/mdviewer.desktop" > "$HOME/.local/share/applications/mdviewer.desktop"
 

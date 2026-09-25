@@ -117,6 +117,17 @@ describe('parseCommandLineArgs', () => {
     expect(parseCommandLineArgs([absolutePath])).toEqual([absolutePath]);
   });
 
+  it('should add target file and its non-system parent directory to allowedPaths', () => {
+    _clearAllowedPaths();
+    const filePath = path.resolve('/home/user/notes/test.md');
+    fs.existsSync.mockImplementation((p) => p === filePath);
+
+    const result = parseCommandLineArgs([filePath]);
+    expect(result).toEqual([filePath]);
+    expect(isPathAllowed(filePath)).toBe(true);
+    expect(isPathAllowed(path.dirname(filePath))).toBe(true);
+  });
+
   it('should resolve relative paths against cwd', () => {
     const cwd = '/mock/cwd';
     const relativeArg = 'docs/file.md';

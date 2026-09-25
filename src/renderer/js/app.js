@@ -1,10 +1,8 @@
-// MDViewer Desktop Main Renderer Script
+const _MDViewerBase = typeof MDViewerBase !== 'undefined'
+  ? MDViewerBase
+  : (typeof require !== 'undefined' ? require('../../shared/js/MDViewerBase') : class {});
 
-if (typeof MDViewerBase === 'undefined' && typeof require !== 'undefined') {
-  var MDViewerBase = require('../../shared/js/MDViewerBase');
-}
-
-class MDViewerApp extends MDViewerBase {
+class MDViewerApp extends _MDViewerBase {
   constructor() {
     super();
     this.init();
@@ -366,9 +364,21 @@ class MDViewerApp extends MDViewerBase {
           const file = e.dataTransfer.files[i];
           if (file.path) {
             if (window.electronAPI && window.electronAPI.allowDroppedPath) {
-              await window.electronAPI.allowDroppedPath(file.path);
+              const allowed = await window.electronAPI.allowDroppedPath(file.path);
+              if (allowed) {
+                if (this.isMarkdownPath(file.path)) {
+                  this.openFile(file.path);
+                } else {
+                  this.loadFolder(file.path, true, true);
+                }
+              }
+            } else {
+              if (this.isMarkdownPath(file.path)) {
+                this.openFile(file.path);
+              } else {
+                this.loadFolder(file.path, true, true);
+              }
             }
-            this.openFile(file.path);
           }
         }
       }

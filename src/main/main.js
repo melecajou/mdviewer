@@ -152,6 +152,10 @@ function parseCommandLineArgs(argv, cwd = process.cwd()) {
     if (target) {
       targets.push(target);
       addAllowedPath(target);
+      const parentDir = path.dirname(target);
+      if (!isSystemOrRootDirectory(parentDir)) {
+        addAllowedPath(parentDir);
+      }
     }
   }
   return targets;
@@ -167,7 +171,13 @@ if (!gotTheLock) {
 } else {
   app.on('second-instance', (event, commandLine, workingDirectory) => {
     const targets = parseCommandLineArgs(commandLine, workingDirectory);
-    targets.forEach(t => addAllowedPath(t));
+    targets.forEach(t => {
+      addAllowedPath(t);
+      const parentDir = path.dirname(t);
+      if (!isSystemOrRootDirectory(parentDir)) {
+        addAllowedPath(parentDir);
+      }
+    });
     if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
@@ -186,7 +196,13 @@ if (!gotTheLock) {
     // Initialize Allowed Paths from store and other known locations
     const allSettings = store.getAll();
     if (allSettings.recentFiles) {
-      allSettings.recentFiles.forEach(f => addAllowedPath(f));
+      allSettings.recentFiles.forEach(f => {
+        addAllowedPath(f);
+        const parentDir = path.dirname(f);
+        if (!isSystemOrRootDirectory(parentDir)) {
+          addAllowedPath(parentDir);
+        }
+      });
     }
     if (allSettings.recentFolders) {
       allSettings.recentFolders.forEach(f => addAllowedPath(f));
@@ -198,7 +214,13 @@ if (!gotTheLock) {
       addAllowedPath(allSettings.lastDirectory);
     }
     addAllowedPath(path.join(__dirname, '../../sample.md'));
-    pendingTargets.forEach(t => addAllowedPath(t));
+    pendingTargets.forEach(t => {
+      addAllowedPath(t);
+      const parentDir = path.dirname(t);
+      if (!isSystemOrRootDirectory(parentDir)) {
+        addAllowedPath(parentDir);
+      }
+    });
 
     createWindow();
 
@@ -461,46 +483,63 @@ function createAppMenu() {
 
 // Dialog: Open File
 ipcMain.handle('dialog:open-file', async (event, preferredPath) => {
-  const defaultPath = await store.getLastDirectory(preferredPath);
-  const options = {
-    title: 'Abrir Arquivo Markdown',
-    properties: ['openFile'],
-    filters: [
-      { name: 'Arquivos Markdown', extensions: ['md', 'markdown', 'mdown', 'mkd', 'mdx', 'txt'] },
-      { name: 'Todos os Arquivos', extensions: ['*'] }
-    ]
-  };
-  if (defaultPath) {
-    options.defaultPath = defaultPath;
-  }
-  const result = await dialog.showOpenDialog(mainWindow, options);
-  if (!result.canceled && result.filePaths.length > 0) {
-    const selected = result.filePaths[0];
-    addAllowedPath(selected);
-    addAllowedPath(path.dirname(selected));
-    store.setLastDirectory(path.dirname(selected));
-    return selected;
+  try {
+    const defaultPath = await store.getLastDirectory(preferredPath);
+    const options = {
+      title: 'Abrir Arquivo Markdown',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Arquivos Markdown', extensions: ['md', 'markdown', 'mdown', 'mkd', 'mdx', 'txt'] },
+        { name: 'Todos os Arquivos', extensions: ['*'] }
+      ]
+    };
+    if (defaultPath) {
+      options.defaultPath = defaultPath;
+    }
+    const win = (event && event.sender && BrowserWindow.fromWebContents(event.sender)) || mainWindow;
+    const result = win && !win.isDestroyed()
+      ? await dialog.showOpenDialog(win, options)
+      : await dialog.showOpenDialog(options);
+    if (!result.canceled && result.filePaths.length > 0) {
+      const selected = result.filePaths[0];
+      addAllowedPath(selected);
+      const parentDir = path.dirname(selected);
+      if (!isSystemOrRootDirectory(parentDir)) {
+        addAllowedPath(parentDir);
+      }
+      store.setLastDirectory(parentDir);
+      return selected;
+    }
+  } catch (err) {
+    console.error('Error in dialog:open-file:', err);
   }
   return null;
 });
 
 // Dialog: Open Folder
 ipcMain.handle('dialog:open-folder', async (event, preferredPath) => {
-  const defaultPath = await store.getLastDirectory(preferredPath);
-  const options = {
-    title: 'Abrir Pasta no Explorador',
-    properties: ['openDirectory']
-  };
-  if (defaultPath) {
-    options.defaultPath = defaultPath;
-  }
-  const result = await dialog.showOpenDialog(mainWindow, options);
-  if (!result.canceled && result.filePaths.length > 0) {
-    const selected = result.filePaths[0];
-    addAllowedPath(selected);
-    store.setLastDirectory(selected);
-    store.set('lastOpenedFolder', selected);
-    return selected;
+  try {
+    const defaultPath = await store.getLastDirectory(preferredPath);
+    const options = {
+      title: 'Abrir Pasta no Explorador',
+      properties: ['openDirectory']
+    };
+    if (defaultPath) {
+      options.defaultPath = defaultPath;
+    }
+    const win = (event && event.sender && BrowserWindow.fromWebContents(event.sender)) || mainWindow;
+    const result = win && !win.isDestroyed()
+      ? await dialog.showOpenDialog(win, options)
+      : await dialog.showOpenDialog(options);
+    if (!result.canceled && result.filePaths.length > 0) {
+      const selected = result.filePaths[0];
+      addAllowedPath(selected);
+      store.setLastDirectory(selected);
+      store.set('lastOpenedFolder', selected);
+      return selected;
+    }
+  } catch (err) {
+    console.error('Error in dialog:open-folder:', err);
   }
   return null;
 });

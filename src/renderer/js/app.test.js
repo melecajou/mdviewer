@@ -149,4 +149,52 @@ describe('MDViewerApp - bindEvents refactoring', () => {
     app.btnSaveFile.click();
     expect(app.handleSaveFile).toHaveBeenCalledTimes(1);
   });
+
+  it('should evaluate app.js cleanly in a browser environment with global.MDViewerBase without SyntaxError', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const appCode = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8');
+
+    // Simulate browser environment where MDViewerBase is defined on global
+    global.MDViewerBase = MDViewerBase;
+    expect(() => {
+      // Evaluating app.js must not throw SyntaxError (e.g. Identifier 'MDViewerBase' has already been declared)
+      new Function('require', 'module', 'exports', 'window', 'document', appCode);
+    }).not.toThrow();
+  });
+
+  it('should route dropped markdown files to openFile and folders to loadFolder', async () => {
+    app.openFile = jest.fn();
+    app.loadFolder = jest.fn();
+    window.electronAPI.allowDroppedPath = jest.fn().mockResolvedValue(true);
+
+    app.bindDragAndDropEvents();
+
+    // Trigger drop with a markdown file
+    const fileEvent = new Event('drop');
+    fileEvent.dataTransfer = {
+      files: [{ path: '/home/user/document.md' }]
+    };
+    window.dispatchEvent(fileEvent);
+    await Promise.resolve();
+
+    expect(window.electronAPI.allowDroppedPath).toHaveBeenCalledWith('/home/user/document.md');
+    expect(app.openFile).toHaveBeenCalledWith('/home/user/document.md');
+    expect(app.loadFolder).not.toHaveBeenCalled();
+
+    app.openFile.mockClear();
+    app.loadFolder.mockClear();
+
+    // Trigger drop with a directory
+    const folderEvent = new Event('drop');
+    folderEvent.dataTransfer = {
+      files: [{ path: '/home/user/my-notes' }]
+    };
+    window.dispatchEvent(folderEvent);
+    await Promise.resolve();
+
+    expect(window.electronAPI.allowDroppedPath).toHaveBeenCalledWith('/home/user/my-notes');
+    expect(app.loadFolder).toHaveBeenCalledWith('/home/user/my-notes', true, true);
+    expect(app.openFile).not.toHaveBeenCalled();
+  });
 });
