@@ -172,18 +172,22 @@ describe('FileWatcherManager', () => {
       );
     });
 
-    it('should handle chokidar.watch exceptions', () => {
+    it('should handle chokidar.watch exceptions and not store watcher', () => {
+      const filePath = 'test.md';
+      const resolvedPath = path.resolve(filePath);
+      const watchError = new Error('Watch failed');
+
       chokidar.watch.mockImplementationOnce(() => {
-        throw new Error('Watch failed');
+        throw watchError;
       });
 
-      const filePath = 'test.md';
       watcherManager.watch(filePath);
 
       expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to watch file'),
-        expect.any(Error)
+        `Failed to watch file ${resolvedPath}:`,
+        watchError
       );
+      expect(watcherManager.watchers.has(resolvedPath)).toBe(false);
     });
   });
 
@@ -215,6 +219,20 @@ describe('FileWatcherManager', () => {
       jest.advanceTimersByTime(100);
       expect(mockNotifyCallback).not.toHaveBeenCalled(); // timer was cleared
     });
+
+    it('should log error if watcher.close() rejects', async () => {
+      const filePath = 'test.md';
+      const closeError = new Error('Close failed');
+      mockChokidarWatcher.close.mockRejectedValueOnce(closeError);
+
+      watcherManager.watch(filePath);
+      watcherManager.unwatch(filePath);
+
+      // Wait for promise microtask queue to resolve catch block
+      await Promise.resolve();
+
+      expect(console.error).toHaveBeenCalledWith(closeError);
+    });
   });
 
   describe('clear', () => {
@@ -239,6 +257,19 @@ describe('FileWatcherManager', () => {
 
       jest.advanceTimersByTime(100);
       expect(mockNotifyCallback).not.toHaveBeenCalled(); // timer was cleared
+    });
+
+    it('should log error if watcher.close() rejects during clear', async () => {
+      const file1 = 'test1.md';
+      const closeError = new Error('Clear close failed');
+      mockChokidarWatcher.close.mockRejectedValueOnce(closeError);
+
+      watcherManager.watch(file1);
+      watcherManager.clear();
+
+      await Promise.resolve();
+
+      expect(console.error).toHaveBeenCalledWith(closeError);
     });
   });
 });

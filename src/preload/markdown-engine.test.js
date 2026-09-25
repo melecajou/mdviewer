@@ -93,6 +93,18 @@ describe('parseMarkdown', () => {
     highlightAutoSpy.mockRestore();
   });
 
+  test('should fallback to escaping HTML when hljs.highlightAuto fails', () => {
+    const spy = jest.spyOn(hljs, 'highlightAuto').mockImplementation(() => {
+      throw new Error('Highlighting failed');
+    });
+
+    const markdown = '```\nif (a && b < c > d) {}\n```';
+    const result = parseMarkdown(markdown);
+
+    expect(result.html).toContain('if (a &amp;&amp; b &lt; c &gt; d) {}');
+    spy.mockRestore();
+  });
+
   test('should render mermaid code block', () => {
     const result = parseMarkdown('```mermaid\ngraph TD;\nA-->B;\n```');
     expect(result.html).toContain('class="mermaid-block-wrapper"');
