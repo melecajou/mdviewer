@@ -1,3 +1,4 @@
+const hljs = require('highlight.js');
 const { slugify, parseMarkdown } = require('./markdown-engine');
 
 describe('slugify', () => {
@@ -75,8 +76,24 @@ describe('parseMarkdown', () => {
     expect(result.html).toContain('<span class="hljs-keyword">const</span> x = <span class="hljs-number">1</span>;');
   });
 
+  test('should fallback to highlightAuto when hljs.highlight throws an error', () => {
+    const highlightSpy = jest.spyOn(hljs, 'highlight').mockImplementation(() => {
+      throw new Error('Highlight failed');
+    });
+    const highlightAutoSpy = jest.spyOn(hljs, 'highlightAuto');
+
+    const result = parseMarkdown('```js\nconst x = 1;\n```');
+
+    expect(highlightSpy).toHaveBeenCalled();
+    expect(highlightAutoSpy).toHaveBeenCalledWith('const x = 1;');
+    expect(result.html).toContain('class="code-block-wrapper"');
+    expect(result.html).toContain('code-lang-badge');
+
+    highlightSpy.mockRestore();
+    highlightAutoSpy.mockRestore();
+  });
+
   test('should fallback to escaping HTML when hljs.highlightAuto fails', () => {
-    const hljs = require('highlight.js');
     const spy = jest.spyOn(hljs, 'highlightAuto').mockImplementation(() => {
       throw new Error('Highlighting failed');
     });
