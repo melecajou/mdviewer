@@ -14,7 +14,10 @@ jest.mock('electron', () => ({
     on: jest.fn()
   },
   dialog: jest.fn(),
-  shell: jest.fn(),
+  shell: {
+    showItemInFolder: jest.fn(),
+    openExternal: jest.fn()
+  },
   Menu: {
     buildFromTemplate: jest.fn(),
     setApplicationMenu: jest.fn()
@@ -42,7 +45,11 @@ jest.mock('./file-watcher', () => {
 
 const fs = require('fs');
 const path = require('path');
+const { ipcMain, shell } = require('electron');
 const { parseCommandLineArgs, addAllowedPath, allowedPaths, isPathAllowed, _clearAllowedPaths } = require('./main');
+
+const ipcMainHandlers = new Map(ipcMain.handle.mock.calls);
+const allowDroppedPathHandler = ipcMain.handle.mock.calls.find(c => c[0] === 'app:allow-dropped-path')?.[1];
 
 describe('parseCommandLineArgs', () => {
   let originalPlatform;
@@ -72,7 +79,8 @@ describe('parseCommandLineArgs', () => {
     expect(parseCommandLineArgs('string')).toEqual([]);
   });
 
-  it('should ignore null, undefined, and non-string arguments', () => {
+  it('should ignore null, undefined, empty string, and non-string arguments', () => {
+    expect(parseCommandLineArgs([''])).toEqual([]);
     expect(parseCommandLineArgs([null, undefined, 123, {}, []])).toEqual([]);
   });
 
@@ -309,5 +317,102 @@ describe('isPathAllowed', () => {
     } finally {
       path.resolve = originalResolve;
     }
+  });
+});
+
+describe('shell:show-in-folder IPC handler', () => {
+  let showInFolderHandler;
+
+  beforeAll(() => {
+    showInFolderHandler = ipcMainHandlers.get('shell:show-in-folder');
+  });
+
+  beforeEach(() => {
+    _clearAllowedPaths();
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  it('should be registered with ipcMain', () => {
+    expect(showInFolderHandler).toBeDefined();
+    expect(typeof showInFolderHandler).toBe('function');
+  });
+
+  it('should call shell.showItemInFolder when filePath exists and is allowed', async () => {
+    const filePath = path.resolve('/test/allowed/file.md');
+    addAllowedPath(filePath);
+
+    jest.spyOn(fs.promises, 'access').mockResolvedValue(undefined);
+
+    const result = await showInFolderHandler({}, filePath);
+
+    expect(fs.promises.access).toHaveBeenCalledWith(filePath);
+    expect(shell.showItemInFolder).toHaveBeenCalledWith(filePath);
+    expect(result).toBe(true);
+  });
+
+  it('should not call shell.showItemInFolder if path is not allowed', async () => {
+    const filePath = path.resolve('/test/unallowed/file.md');
+    jest.spyOn(fs.promises, 'access').mockResolvedValue(undefined);
+
+    const result = await showInFolderHandler({}, filePath);
+
+    expect(fs.promises.access).not.toHaveBeenCalled();
+    expect(shell.showItemInFolder).not.toHaveBeenCalled();
+    expect(result).toBe(true);
+  });
+
+  it('should not call shell.showItemInFolder if file access fails (does not exist)', async () => {
+    const filePath = path.resolve('/test/allowed/nonexistent.md');
+    addAllowedPath(filePath);
+
+    jest.spyOn(fs.promises, 'access').mockRejectedValue(new Error('ENOENT'));
+
+    const result = await showInFolderHandler({}, filePath);
+
+    expect(fs.promises.access).toHaveBeenCalledWith(filePath);
+    expect(shell.showItemInFolder).not.toHaveBeenCalled();
+    expect(result).toBe(true);
+  });
+
+  it('should return true for falsy filePath', async () => {
+    const result = await showInFolderHandler({}, null);
+    expect(shell.showItemInFolder).not.toHaveBeenCalled();
+    expect(result).toBe(true);
+  });
+});
+
+describe('app:allow-dropped-path IPC handler', () => {
+  beforeEach(() => {
+    _clearAllowedPaths();
+    jest.clearAllMocks();
+  });
+
+  it('should return false for invalid target path inputs', async () => {
+    expect(await allowDroppedPathHandler(null, null)).toBe(false);
+    expect(await allowDroppedPathHandler(null, undefined)).toBe(false);
+    expect(await allowDroppedPathHandler(null, 123)).toBe(false);
+    expect(await allowDroppedPathHandler(null, '')).toBe(false);
+  });
+
+  it('should return true and add allowed paths for existing target path', async () => {
+    const targetFile = path.resolve('/test/dir/dropped.md');
+    jest.spyOn(fs.promises, 'stat').mockResolvedValue({ isFile: () => true });
+
+    const result = await allowDroppedPathHandler(null, targetFile);
+
+    expect(result).toBe(true);
+    expect(isPathAllowed(targetFile)).toBe(true);
+    expect(isPathAllowed(path.dirname(targetFile))).toBe(true);
+  });
+
+  it('should return false when target path does not exist', async () => {
+    const nonExistent = path.resolve('/test/nonexistent.md');
+    jest.spyOn(fs.promises, 'stat').mockRejectedValue(new Error('ENOENT'));
+
+    const result = await allowDroppedPathHandler(null, nonExistent);
+
+    expect(result).toBe(false);
+    expect(isPathAllowed(nonExistent)).toBe(false);
   });
 });

@@ -46,6 +46,10 @@
     "jest-environment-jsdom": "^30.5.1"
   },
   "jest": {
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/"
+    ],
     "modulePathIgnorePatterns": [
       "<rootDir>/dist/"
     ]
