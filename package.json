@@ -14,7 +14,12 @@
     "pack:win": "electron-builder --win --dir",
     "build:win": "electron-builder --win",
     "build:linux": "electron-builder --linux",
-    "test": "jest"
+    "test": "jest src/"
+  },
+  "jest": {
+    "testMatch": [
+      "<rootDir>/src/**/*.test.js"
+    ]
   },
   "keywords": [
     "markdown",

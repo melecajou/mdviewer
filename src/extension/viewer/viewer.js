@@ -1405,7 +1405,6 @@ class MDViewerExtensionApp extends MDViewerBase {
     nodes.forEach(textNode => {
       const text = textNode.nodeValue;
       const matches = Array.from(text.matchAll(regex));
-
       if (matches.length > 0) {
         const frag = document.createDocumentFragment();
         let lastIndex = 0;
