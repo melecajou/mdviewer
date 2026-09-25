@@ -1,6 +1,9 @@
 # Dependency directories
 node_modules/
 
+# Coverage
+coverage/
+
 # Build and distribution output
 dist/
 dist-electron/
