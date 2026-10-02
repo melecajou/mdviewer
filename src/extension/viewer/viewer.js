@@ -373,68 +373,107 @@ class MDViewerExtensionApp extends MDViewerBase {
 
   setupKeyboardAndWindowEvents() {
     // Teclas de atalho globais
-    document.addEventListener('keydown', (e) => {
-      const isCmdOrCtrl = e.ctrlKey || e.metaKey;
-      const isEditorFocused = document.activeElement === this.sourceTextarea;
-
-      if (isCmdOrCtrl && e.key.toLowerCase() === 'n' && !e.shiftKey) {
-        e.preventDefault();
-        this.handleNewFile();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 's' && !e.shiftKey) {
-        e.preventDefault();
-        this.handleSaveFile();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'o' && !e.shiftKey) {
-        e.preventDefault();
-        this.handleOpenFile();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'w') {
-        e.preventDefault();
-        if (this.activeTabId) this.closeTab(this.activeTabId);
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'r') {
-        e.preventDefault();
-        this.reloadActiveTab();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'f') {
-        e.preventDefault();
-        this.openFindBar();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'p') {
-        e.preventDefault();
-        this.exportToPdf();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'b') {
-        if (!isEditorFocused) {
-          e.preventDefault();
-          this.toggleSidebar();
-        }
-      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
-        e.preventDefault();
-        this.switchSidebarTab('toc');
-        if (this.isSidebarCollapsed) this.toggleSidebar(true);
-      } else if (e.altKey && e.key === '1') {
-        e.preventDefault();
-        this.setViewMode('preview');
-      } else if (e.altKey && e.key === '2') {
-        e.preventDefault();
-        this.setViewMode('split');
-      } else if (e.altKey && e.key === '3') {
-        e.preventDefault();
-        this.setViewMode('source');
-      } else if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
-        e.preventDefault();
-        this.changeZoom(0.1);
-      } else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
-        e.preventDefault();
-        this.changeZoom(-0.1);
-      } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
-        e.preventDefault();
-        this.resetZoom();
-      } else if (e.key === 'F1') {
-        e.preventDefault();
-        if (this.shortcutsModal) this.shortcutsModal.classList.add('visible');
-      }
-    });
+    document.addEventListener('keydown', (e) => this.handleGlobalKeyboardEvent(e));
 
     // Auto-reload se janela recuperar foco
     window.addEventListener('focus', () => {
       this.checkActiveTabUpdates();
     });
+  }
+
+  handleGlobalKeyboardEvent(e) {
+    const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+    const isEditorFocused = document.activeElement === this.sourceTextarea;
+    const keyLower = e.key.toLowerCase();
+
+    const shortcuts = [
+      {
+        match: () => isCmdOrCtrl && keyLower === 'n' && !e.shiftKey,
+        action: () => { e.preventDefault(); this.handleNewFile(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 's' && !e.shiftKey,
+        action: () => { e.preventDefault(); this.handleSaveFile(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'o' && !e.shiftKey,
+        action: () => { e.preventDefault(); this.handleOpenFile(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'w',
+        action: () => {
+          e.preventDefault();
+          if (this.activeTabId) this.closeTab(this.activeTabId);
+        }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'r',
+        action: () => { e.preventDefault(); this.reloadActiveTab(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'f',
+        action: () => { e.preventDefault(); this.openFindBar(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'p',
+        action: () => { e.preventDefault(); this.exportToPdf(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'b',
+        action: () => {
+          if (!isEditorFocused) {
+            e.preventDefault();
+            this.toggleSidebar();
+          }
+        }
+      },
+      {
+        match: () => isCmdOrCtrl && e.shiftKey && e.key === 'T',
+        action: () => {
+          e.preventDefault();
+          this.switchSidebarTab('toc');
+          if (this.isSidebarCollapsed) this.toggleSidebar(true);
+        }
+      },
+      {
+        match: () => e.altKey && e.key === '1',
+        action: () => { e.preventDefault(); this.setViewMode('preview'); }
+      },
+      {
+        match: () => e.altKey && e.key === '2',
+        action: () => { e.preventDefault(); this.setViewMode('split'); }
+      },
+      {
+        match: () => e.altKey && e.key === '3',
+        action: () => { e.preventDefault(); this.setViewMode('source'); }
+      },
+      {
+        match: () => isCmdOrCtrl && (e.key === '=' || e.key === '+'),
+        action: () => { e.preventDefault(); this.changeZoom(0.1); }
+      },
+      {
+        match: () => isCmdOrCtrl && e.key === '-',
+        action: () => { e.preventDefault(); this.changeZoom(-0.1); }
+      },
+      {
+        match: () => isCmdOrCtrl && e.key === '0',
+        action: () => { e.preventDefault(); this.resetZoom(); }
+      },
+      {
+        match: () => e.key === 'F1',
+        action: () => {
+          e.preventDefault();
+          if (this.shortcutsModal) this.shortcutsModal.classList.add('visible');
+        }
+      }
+    ];
+
+    for (const shortcut of shortcuts) {
+      if (shortcut.match()) {
+        shortcut.action();
+        break;
+      }
+    }
   }
 
   // File & Folder Handlers

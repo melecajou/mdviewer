@@ -270,4 +270,104 @@ describe('MDViewerApp - bindEvents refactoring', () => {
       console.log(`[Baseline / Benchmark] handleInitialTargets execution time: ${duration} ms`);
     });
   });
+
+  describe('handleGlobalKeyboardEvent', () => {
+    beforeEach(() => {
+      app.handleNewFile = jest.fn();
+      app.handleSaveFile = jest.fn();
+      app.handleSaveFileAs = jest.fn();
+      app.handleOpenFile = jest.fn();
+      app.handleOpenFolder = jest.fn();
+      app.closeTab = jest.fn();
+      app.reloadActiveTab = jest.fn();
+      app.openFindBar = jest.fn();
+      app.toggleSidebar = jest.fn();
+      app.exportToPdf = jest.fn();
+      app.changeZoom = jest.fn();
+      app.resetZoom = jest.fn();
+      app.setViewMode = jest.fn();
+      app.closeFindBar = jest.fn();
+    });
+
+    const createKeyboardEvent = (key, opts = {}) => {
+      const e = new KeyboardEvent('keydown', { key, ...opts });
+      e.preventDefault = jest.fn();
+      return e;
+    };
+
+    it('should trigger handleNewFile on Ctrl+N', () => {
+      const e = createKeyboardEvent('n', { ctrlKey: true });
+      app.handleGlobalKeyboardEvent(e);
+      expect(e.preventDefault).toHaveBeenCalled();
+      expect(app.handleNewFile).toHaveBeenCalledTimes(1);
+    });
+
+    it('should trigger handleSaveFile on Ctrl+S', () => {
+      const e = createKeyboardEvent('s', { ctrlKey: true });
+      app.handleGlobalKeyboardEvent(e);
+      expect(e.preventDefault).toHaveBeenCalled();
+      expect(app.handleSaveFile).toHaveBeenCalledTimes(1);
+    });
+
+    it('should trigger handleSaveFileAs on Ctrl+Shift+S', () => {
+      const e = createKeyboardEvent('S', { ctrlKey: true, shiftKey: true });
+      app.handleGlobalKeyboardEvent(e);
+      expect(e.preventDefault).toHaveBeenCalled();
+      expect(app.handleSaveFileAs).toHaveBeenCalledTimes(1);
+    });
+
+    it('should trigger handleOpenFile on Ctrl+O', () => {
+      const e = createKeyboardEvent('o', { ctrlKey: true });
+      app.handleGlobalKeyboardEvent(e);
+      expect(e.preventDefault).toHaveBeenCalled();
+      expect(app.handleOpenFile).toHaveBeenCalledTimes(1);
+    });
+
+    it('should trigger handleOpenFolder on Ctrl+Shift+O', () => {
+      const e = createKeyboardEvent('O', { ctrlKey: true, shiftKey: true });
+      app.handleGlobalKeyboardEvent(e);
+      expect(e.preventDefault).toHaveBeenCalled();
+      expect(app.handleOpenFolder).toHaveBeenCalledTimes(1);
+    });
+
+    it('should trigger closeTab on Ctrl+W if active tab exists', () => {
+      app.activeTabId = 'tab_1';
+      const e = createKeyboardEvent('w', { ctrlKey: true });
+      app.handleGlobalKeyboardEvent(e);
+      expect(e.preventDefault).toHaveBeenCalled();
+      expect(app.closeTab).toHaveBeenCalledWith('tab_1');
+    });
+
+    it('should trigger setViewMode on Alt+1, Alt+2, Alt+3', () => {
+      const e1 = createKeyboardEvent('1', { altKey: true });
+      app.handleGlobalKeyboardEvent(e1);
+      expect(app.setViewMode).toHaveBeenCalledWith('preview');
+
+      const e2 = createKeyboardEvent('2', { altKey: true });
+      app.handleGlobalKeyboardEvent(e2);
+      expect(app.setViewMode).toHaveBeenCalledWith('split');
+
+      const e3 = createKeyboardEvent('3', { altKey: true });
+      app.handleGlobalKeyboardEvent(e3);
+      expect(app.setViewMode).toHaveBeenCalledWith('source');
+    });
+
+    it('should open shortcuts modal on F1', () => {
+      const e = createKeyboardEvent('F1');
+      app.handleGlobalKeyboardEvent(e);
+      expect(e.preventDefault).toHaveBeenCalled();
+      expect(app.shortcutsModal.classList.contains('visible')).toBe(true);
+    });
+
+    it('should close modals and find bar on Escape', () => {
+      app.shortcutsModal.classList.add('visible');
+      app.lightboxModal.classList.add('visible');
+      const e = createKeyboardEvent('Escape');
+      app.handleGlobalKeyboardEvent(e);
+
+      expect(app.shortcutsModal.classList.contains('visible')).toBe(false);
+      expect(app.lightboxModal.classList.contains('visible')).toBe(false);
+      expect(app.closeFindBar).toHaveBeenCalledTimes(1);
+    });
+  });
 });
