@@ -919,6 +919,7 @@ if (process.env.NODE_ENV === 'test') {
     allowedPaths,
     isPathAllowed,
     isSystemOrRootDirectory,
+    normalizeCliArg,
     parseCommandLineArgs,
     _clearAllowedPaths: () => allowedPaths.clear()
   };
