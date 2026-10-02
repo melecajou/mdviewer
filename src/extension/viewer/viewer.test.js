@@ -559,6 +559,26 @@ describe('MDViewerExtensionApp', () => {
       expect(app.isSidebarCollapsed).toBe(true);
     });
 
+    it('should safely render recent files in extension viewer without XSS vulnerability', () => {
+      app.settings = {
+        recentFiles: [
+          { title: '<img src=x onerror=alert(1)>', path: '/path/to/<script>alert(1)</script>.md' }
+        ]
+      };
+
+      app.renderRecentFiles();
+
+      const container = document.getElementById('recent-files-list');
+      expect(container.querySelector('img')).toBeNull();
+      expect(container.querySelector('script')).toBeNull();
+
+      const titleSpan = container.querySelector('.recent-title');
+      const pathSpan = container.querySelector('.recent-path');
+
+      expect(titleSpan.textContent).toBe('<img src=x onerror=alert(1)>');
+      expect(pathSpan.textContent).toBe('/path/to/<script>alert(1)</script>.md');
+    });
+
     it('should handle loadSettings errors gracefully', async () => {
       chrome.storage.local.get.mockRejectedValueOnce(new Error('Storage error'));
       await expect(app.loadSettings()).resolves.not.toThrow();
@@ -592,6 +612,17 @@ describe('MDViewerExtensionApp', () => {
       expect(app.tabs.length).toBe(1);
       expect(app.tabs[0].title).toBe('Doc1.md');
       expect(app.activeTabId).toBe(app.tabs[0].id);
+    });
+
+    it('should escape HTML/XSS payloads in tab titles securely', () => {
+      const maliciousTitle = '<img src="x" onerror="alert(1)">';
+      app.openDocumentTab(maliciousTitle, '# Content', 'malicious.md');
+
+      const tabTitleSpan = document.querySelector('.tab-title');
+      expect(tabTitleSpan).not.toBeNull();
+      expect(tabTitleSpan.textContent).toBe(maliciousTitle);
+      expect(tabTitleSpan.children.length).toBe(0);
+      expect(document.querySelector('#tabs-bar img')).toBeNull();
     });
 
     it('should activate existing tab if path matches', () => {
@@ -736,6 +767,42 @@ describe('MDViewerExtensionApp', () => {
       consoleSpy.mockRestore();
     });
 
+    it('should safely render file and folder names in tree without XSS vulnerabilities', () => {
+      const maliciousTree = [
+        {
+          name: '<img src=x onerror=alert("xss-dir")>',
+          relPath: 'dir',
+          path: 'dir',
+          isDirectory: true,
+          children: [
+            {
+              name: '<script>alert("xss-file")</script>.md',
+              relPath: 'dir/file.md',
+              path: 'dir/file.md',
+              isDirectory: false,
+              isMarkdown: true
+            }
+          ]
+        }
+      ];
+
+      app.renderTreeNodes(maliciousTree);
+
+      const folderItem = app.fileTreeContainer.querySelector('.tree-folder');
+      const fileItem = app.fileTreeContainer.querySelector('.tree-file');
+
+      expect(folderItem).not.toBeNull();
+      expect(fileItem).not.toBeNull();
+
+      // Verify HTML tags were not parsed as DOM elements
+      expect(folderItem.querySelector('img')).toBeNull();
+      expect(fileItem.querySelector('script')).toBeNull();
+
+      // Verify text content matches exact raw string
+      expect(folderItem.querySelector('.tree-item-name').textContent).toBe('<img src=x onerror=alert("xss-dir")>');
+      expect(fileItem.querySelector('.tree-item-name').textContent).toBe('<script>alert("xss-file")</script>.md');
+    });
+
     it('should read file object via readFileObject', async () => {
       const mockFile = { name: 'ReadObj.md', text: jest.fn().mockResolvedValue('# Read Obj') };
       await app.readFileObject(mockFile);
@@ -759,6 +826,32 @@ describe('MDViewerExtensionApp', () => {
       await app.handleOpenFolder();
       expect(app.currentFolder).toBe('MyFolder');
       expect(app.explorerFolderName.textContent).toBe('MyFolder');
+    });
+
+    it('should render file list in explorer correctly constructing folder tree', () => {
+      const files = [
+        { name: 'root.md', webkitRelativePath: 'MyProject/root.md' },
+        { name: 'doc1.md', webkitRelativePath: 'MyProject/sub1/doc1.md' },
+        { name: 'doc2.md', webkitRelativePath: 'MyProject/sub1/sub2/doc2.md' },
+        { name: 'standalone.md' }
+      ];
+
+      app.renderFileListInExplorer('MyProject', files);
+
+      expect(app.currentFolder).toBe('MyProject');
+      expect(app.currentTree).toBeDefined();
+      expect(app.currentTree.length).toBe(3); // 'sub1' folder, 'root.md', 'standalone.md'
+
+      const folderItem = app.currentTree.find(i => i.name === 'sub1');
+      expect(folderItem).toBeDefined();
+      expect(folderItem.isDirectory).toBe(true);
+      expect(folderItem.children.length).toBe(2); // 'sub2' folder, 'doc1.md'
+
+      const sub2Folder = folderItem.children.find(i => i.name === 'sub2');
+      expect(sub2Folder).toBeDefined();
+      expect(sub2Folder.isDirectory).toBe(true);
+      expect(sub2Folder.children[0].name).toBe('doc2.md');
+      expect(sub2Folder.children[0].relPath).toBe('sub1/sub2/doc2.md');
     });
   });
 

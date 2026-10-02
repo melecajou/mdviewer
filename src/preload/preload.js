@@ -3,7 +3,7 @@ const { parseMarkdown } = require('./markdown-engine');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // Markdown Engine
-  parseMarkdown: (content, options) => parseMarkdown(content, options),
+  parseMarkdown: (content) => parseMarkdown(content),
 
   // Dialogs
   openFileDialog: (defaultPath) => ipcRenderer.invoke('dialog:open-file', defaultPath),
