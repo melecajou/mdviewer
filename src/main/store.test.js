@@ -441,12 +441,149 @@ describe('Store', () => {
     });
 
     it('should not set lastDirectory if the folder does not exist on disk', () => {
-      fs.existsSync.mockImplementation((p) => false);
+      fs.existsSync.mockReturnValue(false);
       store.data.lastDirectory = '/previous/dir';
 
       store.addRecentFolder('/nonexistent/folder');
 
       expect(store.data.lastDirectory).toBe('/previous/dir');
+    });
+  });
+
+  describe('getAll', () => {
+    let store;
+
+    beforeEach(() => {
+      store = new Store();
+      store.save = jest.fn();
+    });
+
+    it('should return a copy of all data in store matching defaults upon initialization', () => {
+      const settings = store.getAll();
+
+      expect(settings).toEqual(store.defaults);
+      expect(settings).toEqual(store.data);
+    });
+
+    it('should reflect updated values after settings are modified', () => {
+      store.set('theme', 'github-light');
+      store.set('fontSize', 20);
+
+      const settings = store.getAll();
+
+      expect(settings.theme).toBe('github-light');
+      expect(settings.fontSize).toBe(20);
+      expect(settings.zoomLevel).toBe(1.0);
+    });
+
+    it('should return a copy so mutating returned object does not mutate internal store data', () => {
+      const settings = store.getAll();
+      settings.theme = 'custom-theme';
+      settings.fontSize = 99;
+
+      expect(store.data.theme).toBe('github-dark');
+      expect(store.data.fontSize).toBe(16);
+      expect(store.get('theme')).toBe('github-dark');
+      expect(store.get('fontSize')).toBe(16);
+    });
+  });
+
+  describe('removeRecentFile', () => {
+    let store;
+
+    beforeEach(() => {
+      store = new Store();
+      store.save = jest.fn();
+      jest.clearAllMocks();
+    });
+
+    it('should remove an existing file from recentFiles and call save()', () => {
+      const file1 = path.resolve('/path/to/file1.md');
+      const file2 = path.resolve('/path/to/file2.md');
+      store.data.recentFiles = [file1, file2];
+
+      store.removeRecentFile('/path/to/file1.md');
+
+      expect(store.data.recentFiles).toEqual([file2]);
+      expect(store.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('should normalize path when filtering out file to remove', () => {
+      const targetFile = path.resolve('/path/to/./file.md');
+      const otherFile = path.resolve('/path/to/other.md');
+      store.data.recentFiles = [targetFile, otherFile];
+
+      store.removeRecentFile('/path/to/../to/file.md');
+
+      expect(store.data.recentFiles).toEqual([otherFile]);
+      expect(store.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('should leave recentFiles unchanged and call save() if file is not in list', () => {
+      const file1 = path.resolve('/path/to/file1.md');
+      store.data.recentFiles = [file1];
+
+      store.removeRecentFile('/path/to/nonexistent.md');
+
+      expect(store.data.recentFiles).toEqual([file1]);
+      expect(store.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle undefined or null recentFiles without error', () => {
+      store.data.recentFiles = undefined;
+
+      expect(() => {
+        store.removeRecentFile('/path/to/file.md');
+      }).not.toThrow();
+
+      expect(store.data.recentFiles).toEqual([]);
+      expect(store.save).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('setAll', () => {
+    let store;
+
+    beforeEach(() => {
+      store = new Store();
+      store.save = jest.fn();
+      jest.clearAllMocks();
+    });
+
+    it('should merge new settings with existing settings and call save()', () => {
+      const initialTheme = store.data.theme;
+      const initialFontSize = store.data.fontSize;
+
+      store.setAll({
+        theme: 'light',
+        fontSize: 20
+      });
+
+      expect(store.data.theme).toBe('light');
+      expect(store.data.fontSize).toBe(20);
+      expect(store.data.zoomLevel).toBe(store.defaults.zoomLevel);
+      expect(store.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('should preserve existing settings not included in newSettings', () => {
+      store.data.customKey = 'customValue';
+
+      store.setAll({
+        fontSize: 18
+      });
+
+      expect(store.data.customKey).toBe('customValue');
+      expect(store.data.fontSize).toBe(18);
+      expect(store.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call save() when given an empty object', () => {
+      const initialData = { ...store.data };
+
+      store.setAll({});
+
+      expect(store.data).toEqual(initialData);
+      expect(store.save).toHaveBeenCalledTimes(1);
     });
   });
 });

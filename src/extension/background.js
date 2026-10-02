@@ -22,7 +22,7 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 // Manipulador do menu de contexto
-chrome.contextMenus.onClicked.addListener((info, tab) => {
+chrome.contextMenus.onClicked.addListener((info) => {
   if (info.menuItemId === 'open-in-mdviewer') {
     const targetUrl = info.linkUrl || info.pageUrl;
     openViewerTab(targetUrl);
