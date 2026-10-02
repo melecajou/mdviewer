@@ -449,4 +449,42 @@ describe('Store', () => {
       expect(store.data.lastDirectory).toBe('/previous/dir');
     });
   });
+
+  describe('getAll', () => {
+    let store;
+
+    beforeEach(() => {
+      store = new Store();
+      store.save = jest.fn();
+    });
+
+    it('should return a copy of all data in store matching defaults upon initialization', () => {
+      const settings = store.getAll();
+
+      expect(settings).toEqual(store.defaults);
+      expect(settings).toEqual(store.data);
+    });
+
+    it('should reflect updated values after settings are modified', () => {
+      store.set('theme', 'github-light');
+      store.set('fontSize', 20);
+
+      const settings = store.getAll();
+
+      expect(settings.theme).toBe('github-light');
+      expect(settings.fontSize).toBe(20);
+      expect(settings.zoomLevel).toBe(1.0);
+    });
+
+    it('should return a copy so mutating returned object does not mutate internal store data', () => {
+      const settings = store.getAll();
+      settings.theme = 'custom-theme';
+      settings.fontSize = 99;
+
+      expect(store.data.theme).toBe('github-dark');
+      expect(store.data.fontSize).toBe(16);
+      expect(store.get('theme')).toBe('github-dark');
+      expect(store.get('fontSize')).toBe(16);
+    });
+  });
 });
