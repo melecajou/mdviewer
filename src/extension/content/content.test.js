@@ -59,7 +59,7 @@ describe('Content script (content.js) - Security & Sanitization', () => {
     };
 
     window.DOMPurify = {
-      sanitize: jest.fn((html) => '<h1>Hello </h1>')
+      sanitize: jest.fn(() => '<h1>Hello </h1>')
     };
 
     eval(contentJsCode);
@@ -108,7 +108,6 @@ describe('Content script (content.js) - Security & Sanitization', () => {
         headings: []
       }))
     };
-
     window.DOMPurify = {
       sanitize: jest.fn((html) => html)
     };
@@ -118,6 +117,8 @@ describe('Content script (content.js) - Security & Sanitization', () => {
     const titleEl = document.querySelector('.mdviewer-doc-title');
     expect(titleEl).not.toBeNull();
     expect(titleEl.querySelector('img')).toBeNull();
+    expect(titleEl.innerHTML).not.toContain('<img');
+    expect(titleEl.innerHTML).toContain('&lt;img src=x onerror=alert(1)&gt;.md');
     expect(titleEl.textContent).toBe(maliciousFilename);
     expect(titleEl.getAttribute('title')).toBe(maliciousFilename);
   });

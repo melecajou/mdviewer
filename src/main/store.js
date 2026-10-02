@@ -123,17 +123,29 @@ class Store {
 
     // 4. Most recent files' directories
     const recents = this.data.recentFiles || [];
-    for (const f of recents) {
-      try {
-        const dir = path.dirname(f);
-        if (await isValidDir(dir)) return dir;
-      } catch {}
+    if (recents.length > 0) {
+      const candidateDirs = recents.map(f => {
+        try {
+          return path.dirname(f);
+        } catch {
+          return null;
+        }
+      });
+      const validities = await Promise.all(candidateDirs.map(d => isValidDir(d)));
+      const validIndex = validities.findIndex(Boolean);
+      if (validIndex !== -1) {
+        return candidateDirs[validIndex];
+      }
     }
 
     // 5. Most recent folders
     const recentFolders = this.data.recentFolders || [];
-    for (const f of recentFolders) {
-      if (await isValidDir(f)) return f;
+    if (recentFolders.length > 0) {
+      const validities = await Promise.all(recentFolders.map(f => isValidDir(f)));
+      const validIndex = validities.findIndex(Boolean);
+      if (validIndex !== -1) {
+        return recentFolders[validIndex];
+      }
     }
 
     // 6. Documents or Home folder
