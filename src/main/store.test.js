@@ -441,7 +441,7 @@ describe('Store', () => {
     });
 
     it('should not set lastDirectory if the folder does not exist on disk', () => {
-      fs.existsSync.mockImplementation((p) => false);
+      fs.existsSync.mockReturnValue(false);
       store.data.lastDirectory = '/previous/dir';
 
       store.addRecentFolder('/nonexistent/folder');
@@ -499,6 +499,52 @@ describe('Store', () => {
       }).not.toThrow();
 
       expect(store.data.recentFiles).toEqual([]);
+      expect(store.save).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('setAll', () => {
+    let store;
+
+    beforeEach(() => {
+      store = new Store();
+      store.save = jest.fn();
+      jest.clearAllMocks();
+    });
+
+    it('should merge new settings with existing settings and call save()', () => {
+      const initialTheme = store.data.theme;
+      const initialFontSize = store.data.fontSize;
+
+      store.setAll({
+        theme: 'light',
+        fontSize: 20
+      });
+
+      expect(store.data.theme).toBe('light');
+      expect(store.data.fontSize).toBe(20);
+      expect(store.data.zoomLevel).toBe(store.defaults.zoomLevel);
+      expect(store.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('should preserve existing settings not included in newSettings', () => {
+      store.data.customKey = 'customValue';
+
+      store.setAll({
+        fontSize: 18
+      });
+
+      expect(store.data.customKey).toBe('customValue');
+      expect(store.data.fontSize).toBe(18);
+      expect(store.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call save() when given an empty object', () => {
+      const initialData = { ...store.data };
+
+      store.setAll({});
+
+      expect(store.data).toEqual(initialData);
       expect(store.save).toHaveBeenCalledTimes(1);
     });
   });
