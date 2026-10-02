@@ -368,7 +368,7 @@ function createCustomRenderer(headings) {
   return renderer;
 }
 
-function parseMarkdown(rawContent, options = {}) {
+function parseMarkdown(rawContent) {
   const headings = [];
   const { markdown: preparedMarkdown, restoreMath } = processMath(rawContent);
 
