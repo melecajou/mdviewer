@@ -386,69 +386,110 @@ class MDViewerApp extends _MDViewerBase {
   }
 
   bindGlobalKeyboardEvents() {
-    window.addEventListener('keydown', (e) => {
-      const isCmdOrCtrl = e.ctrlKey || e.metaKey;
-      const isEditorFocused = document.activeElement === this.sourceTextarea;
-      
-      if (isCmdOrCtrl && e.key.toLowerCase() === 'n' && !e.shiftKey) {
-        e.preventDefault();
-        this.handleNewFile();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 's' && !e.shiftKey) {
-        e.preventDefault();
-        this.handleSaveFile();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 's' && e.shiftKey) {
-        e.preventDefault();
-        this.handleSaveFileAs();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'o' && !e.shiftKey) {
-        e.preventDefault();
-        this.handleOpenFile();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'o' && e.shiftKey) {
-        e.preventDefault();
-        this.handleOpenFolder();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'w') {
-        e.preventDefault();
-        if (this.activeTabId) this.closeTab(this.activeTabId);
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'r') {
-        e.preventDefault();
-        this.reloadActiveTab();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'f') {
-        e.preventDefault();
-        this.openFindBar();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'b') {
-        if (!isEditorFocused) {
+    window.addEventListener('keydown', (e) => this.handleGlobalKeyboardEvent(e));
+  }
+
+  handleGlobalKeyboardEvent(e) {
+    const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+    const isEditorFocused = document.activeElement === this.sourceTextarea;
+    const keyLower = e.key.toLowerCase();
+
+    const shortcuts = [
+      {
+        match: () => isCmdOrCtrl && keyLower === 'n' && !e.shiftKey,
+        action: () => { e.preventDefault(); this.handleNewFile(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 's' && !e.shiftKey,
+        action: () => { e.preventDefault(); this.handleSaveFile(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 's' && e.shiftKey,
+        action: () => { e.preventDefault(); this.handleSaveFileAs(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'o' && !e.shiftKey,
+        action: () => { e.preventDefault(); this.handleOpenFile(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'o' && e.shiftKey,
+        action: () => { e.preventDefault(); this.handleOpenFolder(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'w',
+        action: () => {
           e.preventDefault();
-          this.toggleSidebar();
+          if (this.activeTabId) this.closeTab(this.activeTabId);
         }
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'p') {
-        e.preventDefault();
-        this.exportToPdf();
-      } else if (isCmdOrCtrl && (e.key === '=' || e.key === '+')) {
-        e.preventDefault();
-        this.changeZoom(0.1);
-      } else if (isCmdOrCtrl && (e.key === '-' || e.key === '_')) {
-        e.preventDefault();
-        this.changeZoom(-0.1);
-      } else if (isCmdOrCtrl && e.key === '0') {
-        e.preventDefault();
-        this.resetZoom();
-      } else if (e.altKey && e.key === '1') {
-        e.preventDefault();
-        this.setViewMode('preview');
-      } else if (e.altKey && e.key === '2') {
-        e.preventDefault();
-        this.setViewMode('split');
-      } else if (e.altKey && e.key === '3') {
-        e.preventDefault();
-        this.setViewMode('source');
-      } else if (e.key === 'F1') {
-        e.preventDefault();
-        if (this.shortcutsModal) this.shortcutsModal.classList.add('visible');
-      } else if (e.key === 'Escape') {
-        if (this.shortcutsModal) this.shortcutsModal.classList.remove('visible');
-        if (this.lightboxModal) this.lightboxModal.classList.remove('visible');
-        this.closeFindBar();
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'r',
+        action: () => { e.preventDefault(); this.reloadActiveTab(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'f',
+        action: () => { e.preventDefault(); this.openFindBar(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'b',
+        action: () => {
+          if (!isEditorFocused) {
+            e.preventDefault();
+            this.toggleSidebar();
+          }
+        }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'p',
+        action: () => { e.preventDefault(); this.exportToPdf(); }
+      },
+      {
+        match: () => isCmdOrCtrl && (e.key === '=' || e.key === '+'),
+        action: () => { e.preventDefault(); this.changeZoom(0.1); }
+      },
+      {
+        match: () => isCmdOrCtrl && (e.key === '-' || e.key === '_'),
+        action: () => { e.preventDefault(); this.changeZoom(-0.1); }
+      },
+      {
+        match: () => isCmdOrCtrl && e.key === '0',
+        action: () => { e.preventDefault(); this.resetZoom(); }
+      },
+      {
+        match: () => e.altKey && e.key === '1',
+        action: () => { e.preventDefault(); this.setViewMode('preview'); }
+      },
+      {
+        match: () => e.altKey && e.key === '2',
+        action: () => { e.preventDefault(); this.setViewMode('split'); }
+      },
+      {
+        match: () => e.altKey && e.key === '3',
+        action: () => { e.preventDefault(); this.setViewMode('source'); }
+      },
+      {
+        match: () => e.key === 'F1',
+        action: () => {
+          e.preventDefault();
+          if (this.shortcutsModal) this.shortcutsModal.classList.add('visible');
+        }
+      },
+      {
+        match: () => e.key === 'Escape',
+        action: () => {
+          if (this.shortcutsModal) this.shortcutsModal.classList.remove('visible');
+          if (this.lightboxModal) this.lightboxModal.classList.remove('visible');
+          this.closeFindBar();
+        }
       }
-    });
+    ];
+
+    for (const shortcut of shortcuts) {
+      if (shortcut.match()) {
+        shortcut.action();
+        break;
+      }
+    }
   }
 
   setupIpcListeners() {
