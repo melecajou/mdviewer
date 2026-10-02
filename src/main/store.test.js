@@ -450,6 +450,59 @@ describe('Store', () => {
     });
   });
 
+  describe('removeRecentFile', () => {
+    let store;
+
+    beforeEach(() => {
+      store = new Store();
+      store.save = jest.fn();
+      jest.clearAllMocks();
+    });
+
+    it('should remove an existing file from recentFiles and call save()', () => {
+      const file1 = path.resolve('/path/to/file1.md');
+      const file2 = path.resolve('/path/to/file2.md');
+      store.data.recentFiles = [file1, file2];
+
+      store.removeRecentFile('/path/to/file1.md');
+
+      expect(store.data.recentFiles).toEqual([file2]);
+      expect(store.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('should normalize path when filtering out file to remove', () => {
+      const targetFile = path.resolve('/path/to/./file.md');
+      const otherFile = path.resolve('/path/to/other.md');
+      store.data.recentFiles = [targetFile, otherFile];
+
+      store.removeRecentFile('/path/to/../to/file.md');
+
+      expect(store.data.recentFiles).toEqual([otherFile]);
+      expect(store.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('should leave recentFiles unchanged and call save() if file is not in list', () => {
+      const file1 = path.resolve('/path/to/file1.md');
+      store.data.recentFiles = [file1];
+
+      store.removeRecentFile('/path/to/nonexistent.md');
+
+      expect(store.data.recentFiles).toEqual([file1]);
+      expect(store.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle undefined or null recentFiles without error', () => {
+      store.data.recentFiles = undefined;
+
+      expect(() => {
+        store.removeRecentFile('/path/to/file.md');
+      }).not.toThrow();
+
+      expect(store.data.recentFiles).toEqual([]);
+      expect(store.save).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('setAll', () => {
     let store;
 
