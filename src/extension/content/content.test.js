@@ -92,4 +92,30 @@ describe('Content script (content.js) - Security & Sanitization', () => {
     expect(renderedContent.innerHTML).toContain('cancelada por segurança');
     expect(renderedContent.innerHTML).not.toContain('<img src=x onerror=alert(1)>');
   });
+
+  it('should safely escape malicious filenames in the floating toolbar', () => {
+    window.history.pushState({}, 'Test', '/%3Cimg%20src=x%20onerror=alert(1)%3E.md');
+    Object.defineProperty(document, 'contentType', {
+      value: 'text/markdown',
+      configurable: true
+    });
+    document.body.innerHTML = '<pre># Test</pre>';
+
+    window.MDViewerEngine = {
+      parseMarkdown: jest.fn(() => ({
+        html: '<h1>Test</h1>',
+        headings: []
+      }))
+    };
+    window.DOMPurify = {
+      sanitize: jest.fn((html) => html)
+    };
+
+    eval(contentJsCode);
+
+    const titleEl = document.querySelector('.mdviewer-doc-title');
+    expect(titleEl).not.toBeNull();
+    expect(titleEl.innerHTML).not.toContain('<img');
+    expect(titleEl.innerHTML).toContain('&lt;img src=x onerror=alert(1)&gt;.md');
+  });
 });
