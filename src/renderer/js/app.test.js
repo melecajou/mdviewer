@@ -197,4 +197,24 @@ describe('MDViewerApp - bindEvents refactoring', () => {
     expect(app.loadFolder).toHaveBeenCalledWith('/home/user/my-notes', true, true);
     expect(app.openFile).not.toHaveBeenCalled();
   });
+
+  describe('handleInitialTargets performance & behavior', () => {
+    it('should open files/folders for all targets', async () => {
+      const targets = ['/path/doc1.md', '/path/folder1', '/path/doc2.markdown'];
+      window.electronAPI.getInitialTargets = jest.fn().mockResolvedValue(targets);
+
+      app.openFile = jest.fn().mockImplementation((path) => new Promise(res => setTimeout(res, 50)));
+      app.loadFolder = jest.fn().mockImplementation((path, a, b) => new Promise(res => setTimeout(res, 50)));
+
+      const start = Date.now();
+      await app.handleInitialTargets();
+      const duration = Date.now() - start;
+
+      expect(app.openFile).toHaveBeenCalledWith('/path/doc1.md');
+      expect(app.loadFolder).toHaveBeenCalledWith('/path/folder1', true, true);
+      expect(app.openFile).toHaveBeenCalledWith('/path/doc2.markdown');
+
+      console.log(`[Baseline / Benchmark] handleInitialTargets execution time: ${duration} ms`);
+    });
+  });
 });

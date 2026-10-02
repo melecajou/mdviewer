@@ -1059,13 +1059,13 @@ class MDViewerApp extends _MDViewerBase {
       const targets = this.pendingInitialTargets || await window.electronAPI.getInitialTargets();
       this.pendingInitialTargets = null;
       if (Array.isArray(targets) && targets.length > 0) {
-        for (const target of targets) {
-          if (this.isMarkdownPath(target)) {
-            await this.openFile(target);
-          } else {
-            await this.loadFolder(target, true, true);
-          }
-        }
+        await Promise.all(
+          targets.map(target =>
+            this.isMarkdownPath(target)
+              ? this.openFile(target)
+              : this.loadFolder(target, true, true)
+          )
+        );
       }
     } catch (e) {
       console.error('Error handling initial targets:', e);
