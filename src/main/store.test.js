@@ -441,7 +441,7 @@ describe('Store', () => {
     });
 
     it('should not set lastDirectory if the folder does not exist on disk', () => {
-      fs.existsSync.mockImplementation((p) => false);
+      fs.existsSync.mockReturnValue(false);
       store.data.lastDirectory = '/previous/dir';
 
       store.addRecentFolder('/nonexistent/folder');
