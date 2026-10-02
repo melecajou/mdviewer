@@ -59,7 +59,7 @@ describe('Content script (content.js) - Security & Sanitization', () => {
     };
 
     window.DOMPurify = {
-      sanitize: jest.fn((html) => '<h1>Hello </h1>')
+      sanitize: jest.fn(() => '<h1>Hello </h1>')
     };
 
     eval(contentJsCode);
