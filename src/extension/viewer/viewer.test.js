@@ -760,6 +760,32 @@ describe('MDViewerExtensionApp', () => {
       expect(app.currentFolder).toBe('MyFolder');
       expect(app.explorerFolderName.textContent).toBe('MyFolder');
     });
+
+    it('should render file list in explorer correctly constructing folder tree', () => {
+      const files = [
+        { name: 'root.md', webkitRelativePath: 'MyProject/root.md' },
+        { name: 'doc1.md', webkitRelativePath: 'MyProject/sub1/doc1.md' },
+        { name: 'doc2.md', webkitRelativePath: 'MyProject/sub1/sub2/doc2.md' },
+        { name: 'standalone.md' }
+      ];
+
+      app.renderFileListInExplorer('MyProject', files);
+
+      expect(app.currentFolder).toBe('MyProject');
+      expect(app.currentTree).toBeDefined();
+      expect(app.currentTree.length).toBe(3); // 'sub1' folder, 'root.md', 'standalone.md'
+
+      const folderItem = app.currentTree.find(i => i.name === 'sub1');
+      expect(folderItem).toBeDefined();
+      expect(folderItem.isDirectory).toBe(true);
+      expect(folderItem.children.length).toBe(2); // 'sub2' folder, 'doc1.md'
+
+      const sub2Folder = folderItem.children.find(i => i.name === 'sub2');
+      expect(sub2Folder).toBeDefined();
+      expect(sub2Folder.isDirectory).toBe(true);
+      expect(sub2Folder.children[0].name).toBe('doc2.md');
+      expect(sub2Folder.children[0].relPath).toBe('sub1/sub2/doc2.md');
+    });
   });
 
   describe('UI Modes, Zoom, Themes & Formatting', () => {
