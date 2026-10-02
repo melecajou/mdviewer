@@ -163,6 +163,40 @@ describe('MDViewerApp - bindEvents refactoring', () => {
     }).not.toThrow();
   });
 
+  it('should safely render file and folder names in file tree without XSS vulnerabilities', () => {
+    const maliciousTree = [
+      {
+        name: '<img src=x onerror=alert("xss-folder")>',
+        path: '/path/folder',
+        isDirectory: true,
+        children: [
+          {
+            name: '<script>alert("xss-file")</script>.md',
+            path: '/path/folder/file.md',
+            isDirectory: false,
+            isMarkdown: true
+          }
+        ]
+      }
+    ];
+
+    app.renderFileTree(maliciousTree);
+
+    const folderItem = app.fileTreeContainer.querySelector('.tree-folder');
+    const fileItem = app.fileTreeContainer.querySelector('.tree-file');
+
+    expect(folderItem).not.toBeNull();
+    expect(fileItem).not.toBeNull();
+
+    // Verify HTML tags were not parsed as DOM elements
+    expect(folderItem.querySelector('img')).toBeNull();
+    expect(fileItem.querySelector('script')).toBeNull();
+
+    // Verify text content matches exact raw string
+    expect(folderItem.querySelector('.tree-item-name').textContent).toBe('<img src=x onerror=alert("xss-folder")>');
+    expect(fileItem.querySelector('.tree-item-name').textContent).toBe('<script>alert("xss-file")</script>.md');
+  });
+
   it('should route dropped markdown files to openFile and folders to loadFolder', async () => {
     app.openFile = jest.fn();
     app.loadFolder = jest.fn();
@@ -196,6 +230,25 @@ describe('MDViewerApp - bindEvents refactoring', () => {
     expect(window.electronAPI.allowDroppedPath).toHaveBeenCalledWith('/home/user/my-notes');
     expect(app.loadFolder).toHaveBeenCalledWith('/home/user/my-notes', true, true);
     expect(app.openFile).not.toHaveBeenCalled();
+  });
+
+  it('should safely escape HTML in recent file names and paths to prevent XSS in renderRecentFiles', async () => {
+    const maliciousPath = '/path/to/<img src=x onerror=alert(1)>.md';
+    window.electronAPI.getSettings = jest.fn().mockResolvedValue({
+      recentFiles: [maliciousPath]
+    });
+
+    await app.renderRecentFiles();
+
+    // Ensure no img elements or unescaped tags were rendered
+    const imgElement = app.recentFilesList.querySelector('img');
+    expect(imgElement).toBeNull();
+
+    const nameSpan = app.recentFilesList.querySelector('.recent-name');
+    const pathSpan = app.recentFilesList.querySelector('.recent-path');
+
+    expect(nameSpan.textContent).toBe('<img src=x onerror=alert(1)>.md');
+    expect(pathSpan.textContent).toBe(maliciousPath);
   });
 
   describe('handleInitialTargets performance & behavior', () => {
