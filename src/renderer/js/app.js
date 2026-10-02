@@ -1268,7 +1268,13 @@ class MDViewerApp extends _MDViewerBase {
     this.recentFilesList.innerHTML = '';
 
     if (recents.length === 0) {
-      this.recentFilesList.innerHTML = '<p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-top: 20px;">Nenhum arquivo recente.</p>';
+      const emptyMsg = document.createElement('p');
+      emptyMsg.style.fontSize = '0.78rem';
+      emptyMsg.style.color = 'var(--text-muted)';
+      emptyMsg.style.textAlign = 'center';
+      emptyMsg.style.marginTop = '20px';
+      emptyMsg.textContent = 'Nenhum arquivo recente.';
+      this.recentFilesList.appendChild(emptyMsg);
       return;
     }
 
@@ -1277,13 +1283,27 @@ class MDViewerApp extends _MDViewerBase {
       const li = document.createElement('li');
       li.className = 'recent-item';
 
-      li.innerHTML = `
-        <div class="recent-info">
-          <span class="recent-name">${fileName}</span>
-          <span class="recent-path">${filePath}</span>
-        </div>
-        <button class="recent-remove-btn" title="Remover dos recentes">✕</button>
-      `;
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'recent-info';
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'recent-name';
+      nameSpan.textContent = fileName;
+
+      const pathSpan = document.createElement('span');
+      pathSpan.className = 'recent-path';
+      pathSpan.textContent = filePath;
+
+      infoDiv.appendChild(nameSpan);
+      infoDiv.appendChild(pathSpan);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'recent-remove-btn';
+      removeBtn.title = 'Remover dos recentes';
+      removeBtn.textContent = '✕';
+
+      li.appendChild(infoDiv);
+      li.appendChild(removeBtn);
 
       li.addEventListener('click', (e) => {
         if (!e.target.classList.contains('recent-remove-btn')) {
@@ -1291,7 +1311,6 @@ class MDViewerApp extends _MDViewerBase {
         }
       });
 
-      const removeBtn = li.querySelector('.recent-remove-btn');
       removeBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
         await window.electronAPI.removeRecentFile(filePath);

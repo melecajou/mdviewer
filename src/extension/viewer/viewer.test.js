@@ -559,6 +559,26 @@ describe('MDViewerExtensionApp', () => {
       expect(app.isSidebarCollapsed).toBe(true);
     });
 
+    it('should safely render recent files in extension viewer without XSS vulnerability', () => {
+      app.settings = {
+        recentFiles: [
+          { title: '<img src=x onerror=alert(1)>', path: '/path/to/<script>alert(1)</script>.md' }
+        ]
+      };
+
+      app.renderRecentFiles();
+
+      const container = document.getElementById('recent-files-list');
+      expect(container.querySelector('img')).toBeNull();
+      expect(container.querySelector('script')).toBeNull();
+
+      const titleSpan = container.querySelector('.recent-title');
+      const pathSpan = container.querySelector('.recent-path');
+
+      expect(titleSpan.textContent).toBe('<img src=x onerror=alert(1)>');
+      expect(pathSpan.textContent).toBe('/path/to/<script>alert(1)</script>.md');
+    });
+
     it('should handle loadSettings errors gracefully', async () => {
       chrome.storage.local.get.mockRejectedValueOnce(new Error('Storage error'));
       await expect(app.loadSettings()).resolves.not.toThrow();
