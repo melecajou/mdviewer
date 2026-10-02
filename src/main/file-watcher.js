@@ -81,7 +81,7 @@ class FileWatcherManager {
   }
 
   clear() {
-    for (const [filePath, watcher] of this.watchers.entries()) {
+    for (const watcher of this.watchers.values()) {
       watcher.close().catch(console.error);
     }
     this.watchers.clear();

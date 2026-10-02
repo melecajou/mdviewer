@@ -163,7 +163,7 @@ function createCustomRenderer(headings) {
   };
 
   // Custom code block renderer with highlight.js & Mermaid support
-  renderer.code = function (codeOrObj, infostringOrUndefined, escapedOrUndefined) {
+  renderer.code = function (codeOrObj, infostringOrUndefined) {
     let code = '';
     let lang = '';
     if (typeof codeOrObj === 'object' && codeOrObj !== null) {
@@ -368,7 +368,7 @@ function createCustomRenderer(headings) {
   return renderer;
 }
 
-function parseMarkdown(rawContent, options = {}) {
+function parseMarkdown(rawContent) {
   const headings = [];
   const { markdown: preparedMarkdown, restoreMath } = processMath(rawContent);
 
