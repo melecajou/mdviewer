@@ -46,7 +46,7 @@ jest.mock('./file-watcher', () => {
 const fs = require('fs');
 const path = require('path');
 const { ipcMain, shell } = require('electron');
-const { parseCommandLineArgs, addAllowedPath, allowedPaths, isPathAllowed, isSystemOrRootDirectory, _clearAllowedPaths } = require('./main');
+const { parseCommandLineArgs, addAllowedPath, allowedPaths, isIgnoredArg, isPathAllowed, isSystemOrRootDirectory, _clearAllowedPaths } = require('./main');
 
 const ipcMainHandlers = new Map(ipcMain.handle.mock.calls);
 const openExternalHandler = ipcMainHandlers.get('shell:open-external');
@@ -328,6 +328,35 @@ describe('isPathAllowed', () => {
     } finally {
       path.resolve = originalResolve;
     }
+  });
+});
+
+describe('isIgnoredArg', () => {
+  it('should return true for flags starting with -', () => {
+    expect(isIgnoredArg('-v')).toBe(true);
+    expect(isIgnoredArg('--version')).toBe(true);
+    expect(isIgnoredArg('--ozone-platform=wayland')).toBe(true);
+    expect(isIgnoredArg('-')).toBe(true);
+  });
+
+  it('should return true for electron and mdviewer binary paths', () => {
+    expect(isIgnoredArg('/usr/bin/electron')).toBe(true);
+    expect(isIgnoredArg('C:\\Program Files\\Electron\\electron.exe')).toBe(true);
+    expect(isIgnoredArg('/usr/lib/electron/electron.exe')).toBe(true);
+    expect(isIgnoredArg('C:\\Program Files\\MDViewer\\mdviewer.exe')).toBe(true);
+    expect(isIgnoredArg('/opt/mdviewer/mdviewer.exe')).toBe(true);
+  });
+
+  it('should return true for exact matches of electron or mdviewer', () => {
+    expect(isIgnoredArg('electron')).toBe(true);
+    expect(isIgnoredArg('mdviewer')).toBe(true);
+  });
+
+  it('should return false for regular file paths and non-ignored arguments', () => {
+    expect(isIgnoredArg('/home/user/document.md')).toBe(false);
+    expect(isIgnoredArg('relative/path/to/readme.markdown')).toBe(false);
+    expect(isIgnoredArg('electron.js')).toBe(false);
+    expect(isIgnoredArg('mdviewer.md')).toBe(false);
   });
 });
 
