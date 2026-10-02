@@ -543,7 +543,7 @@ class MDViewerApp extends _MDViewerBase {
   // ---------------- File & Tab Operations ----------------
 
   async handleOpenFile() {
-    const currentTab = this.tabs.find(t => t.id === this.activeTabId);
+    const currentTab = this.getActiveTab();
     const preferredDir = currentTab ? currentTab.dirName : this.currentFolder;
     const filePath = await window.electronAPI.openFileDialog(preferredDir);
     if (filePath) {
@@ -617,7 +617,7 @@ class MDViewerApp extends _MDViewerBase {
 
   switchTab(tabId) {
     // Save current scroll position
-    const currentTab = this.tabs.find(t => t.id === this.activeTabId);
+    const currentTab = this.getActiveTab();
     if (currentTab) {
       currentTab.scrollPos = this.previewPane.scrollTop;
       const currentTabEl = document.getElementById(`tab-el-${currentTab.id}`);
@@ -754,13 +754,13 @@ class MDViewerApp extends _MDViewerBase {
   }
 
   async handleSaveFile() {
-    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    const activeTab = this.getActiveTab();
     if (!activeTab) return;
     return await this.saveTab(activeTab);
   }
 
   async handleSaveFileAs() {
-    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    const activeTab = this.getActiveTab();
     if (!activeTab) return;
     return await this.saveTabAs(activeTab);
   }
@@ -828,7 +828,7 @@ class MDViewerApp extends _MDViewerBase {
   }
 
   handleEditorInput() {
-    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    const activeTab = this.getActiveTab();
     if (!activeTab) return;
 
     activeTab.content = this.sourceTextarea.value;
@@ -844,7 +844,7 @@ class MDViewerApp extends _MDViewerBase {
   }
 
   toggleTaskCheckbox(taskIndex, isChecked) {
-    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    const activeTab = this.getActiveTab();
     if (!activeTab) return;
 
     let currentIndex = 0;
@@ -1043,7 +1043,7 @@ class MDViewerApp extends _MDViewerBase {
   // ---------------- File Explorer & Folder Navigation ----------------
 
   async handleOpenFolder() {
-    const currentTab = this.tabs.find(t => t.id === this.activeTabId);
+    const currentTab = this.getActiveTab();
     const preferredDir = this.currentFolder || (currentTab ? currentTab.dirName : null);
     const folderPath = await window.electronAPI.openFolderDialog(preferredDir);
     if (folderPath) {
@@ -1100,13 +1100,13 @@ class MDViewerApp extends _MDViewerBase {
       const targets = this.pendingInitialTargets || await window.electronAPI.getInitialTargets();
       this.pendingInitialTargets = null;
       if (Array.isArray(targets) && targets.length > 0) {
-        for (const target of targets) {
-          if (this.isMarkdownPath(target)) {
-            await this.openFile(target);
-          } else {
-            await this.loadFolder(target, true, true);
-          }
-        }
+        await Promise.all(
+          targets.map(target =>
+            this.isMarkdownPath(target)
+              ? this.openFile(target)
+              : this.loadFolder(target, true, true)
+          )
+        );
       }
     } catch (e) {
       console.error('Error handling initial targets:', e);
@@ -1211,8 +1211,10 @@ class MDViewerApp extends _MDViewerBase {
             </svg>
           </span>
           <svg viewBox="0 0 16 16" width="14" height="14" fill="#58a6ff"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z"/></svg>
-          <span class="tree-item-name" style="font-weight: 500;">${item.name}</span>
+          <span class="tree-item-name" style="font-weight: 500;"></span>
         `;
+        const nameEl = itemRow.querySelector('.tree-item-name');
+        if (nameEl) nameEl.textContent = item.name;
         li.appendChild(itemRow);
 
         if (hasChildren) {
@@ -1242,8 +1244,10 @@ class MDViewerApp extends _MDViewerBase {
         itemRow.innerHTML = `
           <span class="tree-arrow-spacer"></span>
           ${iconSvg}
-          <span class="tree-item-name">${item.name}</span>
+          <span class="tree-item-name"></span>
         `;
+        const nameEl = itemRow.querySelector('.tree-item-name');
+        if (nameEl) nameEl.textContent = item.name;
         itemRow.title = item.path;
 
         itemRow.addEventListener('click', () => {
@@ -1253,7 +1257,7 @@ class MDViewerApp extends _MDViewerBase {
         });
 
         // Highlight if already open
-        const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+        const activeTab = this.getActiveTab();
         if (activeTab && activeTab.filePath === item.path) {
           itemRow.classList.add('active');
         }
@@ -1270,7 +1274,7 @@ class MDViewerApp extends _MDViewerBase {
   filterFileTree(query) {
     if (!query) {
       this.renderFileTree(this.currentTree, null, true);
-      const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+      const activeTab = this.getActiveTab();
       if (activeTab) {
         this.updateActiveTreeItem(activeTab.filePath);
       }
@@ -1279,23 +1283,44 @@ class MDViewerApp extends _MDViewerBase {
     const q = query.toLowerCase();
 
     function filterNodes(nodes) {
+      let modified = false;
       const result = [];
-      for (const node of nodes) {
+      for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
         if (node.isDirectory) {
-          const matchingChildren = filterNodes(node.children || []);
-          if (matchingChildren.length > 0 || node.name.toLowerCase().includes(q)) {
-            result.push({ ...node, children: matchingChildren });
+          const children = node.children || [];
+          const matchingChildren = filterNodes(children);
+          const hasMatchingChildren = matchingChildren.length > 0;
+          const nameMatches = node.name.toLowerCase().includes(q);
+
+          if (hasMatchingChildren || nameMatches) {
+            if (matchingChildren === children) {
+              result.push(node);
+            } else {
+              modified = true;
+              result.push({ ...node, children: matchingChildren });
+            }
+          } else {
+            modified = true;
           }
-        } else if (node.name.toLowerCase().includes(q)) {
-          result.push(node);
+        } else {
+          if (node.name.toLowerCase().includes(q)) {
+            result.push(node);
+          } else {
+            modified = true;
+          }
         }
+      }
+
+      if (!modified && result.length === nodes.length) {
+        return nodes;
       }
       return result;
     }
 
     const filtered = filterNodes(this.currentTree);
     this.renderFileTree(filtered, null, false);
-    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    const activeTab = this.getActiveTab();
     if (activeTab) {
       this.updateActiveTreeItem(activeTab.filePath);
     }
@@ -1309,7 +1334,13 @@ class MDViewerApp extends _MDViewerBase {
     this.recentFilesList.innerHTML = '';
 
     if (recents.length === 0) {
-      this.recentFilesList.innerHTML = '<p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-top: 20px;">Nenhum arquivo recente.</p>';
+      const emptyMsg = document.createElement('p');
+      emptyMsg.style.fontSize = '0.78rem';
+      emptyMsg.style.color = 'var(--text-muted)';
+      emptyMsg.style.textAlign = 'center';
+      emptyMsg.style.marginTop = '20px';
+      emptyMsg.textContent = 'Nenhum arquivo recente.';
+      this.recentFilesList.appendChild(emptyMsg);
       return;
     }
 
@@ -1318,13 +1349,27 @@ class MDViewerApp extends _MDViewerBase {
       const li = document.createElement('li');
       li.className = 'recent-item';
 
-      li.innerHTML = `
-        <div class="recent-info">
-          <span class="recent-name">${fileName}</span>
-          <span class="recent-path">${filePath}</span>
-        </div>
-        <button class="recent-remove-btn" title="Remover dos recentes">✕</button>
-      `;
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'recent-info';
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'recent-name';
+      nameSpan.textContent = fileName;
+
+      const pathSpan = document.createElement('span');
+      pathSpan.className = 'recent-path';
+      pathSpan.textContent = filePath;
+
+      infoDiv.appendChild(nameSpan);
+      infoDiv.appendChild(pathSpan);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'recent-remove-btn';
+      removeBtn.title = 'Remover dos recentes';
+      removeBtn.textContent = '✕';
+
+      li.appendChild(infoDiv);
+      li.appendChild(removeBtn);
 
       li.addEventListener('click', (e) => {
         if (!e.target.classList.contains('recent-remove-btn')) {
@@ -1332,7 +1377,6 @@ class MDViewerApp extends _MDViewerBase {
         }
       });
 
-      const removeBtn = li.querySelector('.recent-remove-btn');
       removeBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
         await window.electronAPI.removeRecentFile(filePath);
@@ -1392,7 +1436,7 @@ class MDViewerApp extends _MDViewerBase {
     
     // Re-init Mermaid with matching theme
     this.initMermaid();
-    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    const activeTab = this.getActiveTab();
     if (activeTab) {
       this.renderMarkdown(activeTab);
     }
@@ -1527,14 +1571,14 @@ class MDViewerApp extends _MDViewerBase {
   // ---------------- Exporting ----------------
 
   async exportToPdf() {
-    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    const activeTab = this.getActiveTab();
     const defaultName = activeTab ? activeTab.fileName.replace(/\.[^/.]+$/, '') + '.pdf' : 'documento.pdf';
     const preferredDir = activeTab ? activeTab.dirName : this.currentFolder;
     await window.electronAPI.exportPdf({ defaultName, defaultDir: preferredDir });
   }
 
   async exportToHtml() {
-    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    const activeTab = this.getActiveTab();
     if (!activeTab) return;
 
     const defaultName = activeTab.fileName.replace(/\.[^/.]+$/, '') + '.html';

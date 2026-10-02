@@ -59,7 +59,7 @@ describe('Content script (content.js) - Security & Sanitization', () => {
     };
 
     window.DOMPurify = {
-      sanitize: jest.fn((html) => '<h1>Hello </h1>')
+      sanitize: jest.fn(() => '<h1>Hello </h1>')
     };
 
     eval(contentJsCode);
@@ -91,5 +91,35 @@ describe('Content script (content.js) - Security & Sanitization', () => {
     expect(renderedContent.innerHTML).toContain('DOMPurify');
     expect(renderedContent.innerHTML).toContain('cancelada por segurança');
     expect(renderedContent.innerHTML).not.toContain('<img src=x onerror=alert(1)>');
+  });
+
+  it('should escape malicious HTML and XSS payloads in filename in toolbar', () => {
+    const maliciousFilename = '<img src=x onerror=alert(1)>.md';
+    window.history.pushState({}, 'Test', '/' + encodeURIComponent(maliciousFilename));
+    Object.defineProperty(document, 'contentType', {
+      value: 'text/markdown',
+      configurable: true
+    });
+    document.body.innerHTML = '<pre># Test Document</pre>';
+
+    window.MDViewerEngine = {
+      parseMarkdown: jest.fn(() => ({
+        html: '<h1>Test Document</h1>',
+        headings: []
+      }))
+    };
+    window.DOMPurify = {
+      sanitize: jest.fn((html) => html)
+    };
+
+    eval(contentJsCode);
+
+    const titleEl = document.querySelector('.mdviewer-doc-title');
+    expect(titleEl).not.toBeNull();
+    expect(titleEl.querySelector('img')).toBeNull();
+    expect(titleEl.innerHTML).not.toContain('<img');
+    expect(titleEl.innerHTML).toContain('&lt;img src=x onerror=alert(1)&gt;.md');
+    expect(titleEl.textContent).toBe(maliciousFilename);
+    expect(titleEl.getAttribute('title')).toBe(maliciousFilename);
   });
 });
