@@ -807,12 +807,19 @@ class MDViewerExtensionApp extends MDViewerBase {
       const res = [];
       for (const node of nodes) {
         if (node.isDirectory) {
-          const matchingChildren = filterNodes(node.children || []);
-          if (matchingChildren.length > 0 || node.name.toLowerCase().includes(q)) {
-            res.push({
-              ...node,
-              children: matchingChildren.length > 0 ? matchingChildren : node.children
-            });
+          const origChildren = node.children || [];
+          const matchingChildren = filterNodes(origChildren);
+          const hasMatchingChildren = matchingChildren.length > 0;
+          if (hasMatchingChildren || node.name.toLowerCase().includes(q)) {
+            const finalChildren = hasMatchingChildren ? matchingChildren : origChildren;
+            if (finalChildren === origChildren || (finalChildren.length === origChildren.length && finalChildren.every((c, i) => c === origChildren[i]))) {
+              res.push(node);
+            } else {
+              res.push({
+                ...node,
+                children: finalChildren
+              });
+            }
           }
         } else if (node.name.toLowerCase().includes(q) || (node.relPath && node.relPath.toLowerCase().includes(q))) {
           res.push(node);
