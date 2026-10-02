@@ -49,8 +49,18 @@
     document.body.innerHTML = '';
   }
 
+  function escapeHtml(unsafe) {
+    return (unsafe || '').toString()
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   // Nome do arquivo
   const filename = decodeURIComponent(window.location.pathname.split('/').pop()) || 'documento.md';
+  const safeFilename = escapeHtml(filename);
 
   // Carregar tema inicial das configurações da extensão
   let currentTheme = 'github-dark';
@@ -79,7 +89,7 @@
           </svg>
           MDViewer
         </span>
-        <span class="mdviewer-doc-title" title="${filename}">${filename}</span>
+        <span class="mdviewer-doc-title" title="${safeFilename}">${safeFilename}</span>
       </div>
 
       <div class="mdviewer-toolbar-right">
@@ -217,15 +227,6 @@
         });
       });
     });
-  }
-
-  function escapeHtml(unsafe) {
-    return (unsafe || '').toString()
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
   }
 
   function renderToc(headings) {

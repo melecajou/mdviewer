@@ -199,6 +199,12 @@ class MDViewerExtensionApp extends MDViewerBase {
   }
 
   setupFileAndToolbarEvents() {
+    this.setupFileActionEvents();
+    this.setupFormattingToolbarEvents();
+    this.setupExportEvents();
+  }
+
+  setupFileActionEvents() {
     // File New, Open & Save buttons
     if (this.btnNewFile) this.btnNewFile.addEventListener('click', () => this.handleNewFile());
     if (this.btnOpenFile) this.btnOpenFile.addEventListener('click', () => this.handleOpenFile());
@@ -216,7 +222,9 @@ class MDViewerExtensionApp extends MDViewerBase {
         this.hiddenFileInput.value = '';
       });
     }
+  }
 
+  setupFormattingToolbarEvents() {
     // Formatting Toolbar buttons
     if (this.btnFmtBold) this.btnFmtBold.addEventListener('click', () => this.formatWrap('**', '**', 'negrito'));
     if (this.btnFmtItalic) this.btnFmtItalic.addEventListener('click', () => this.formatWrap('*', '*', 'itálico'));
@@ -231,7 +239,9 @@ class MDViewerExtensionApp extends MDViewerBase {
     if (this.btnFmtLink) this.btnFmtLink.addEventListener('click', () => this.formatLink());
     if (this.btnFmtImage) this.btnFmtImage.addEventListener('click', () => this.formatImage());
     if (this.btnFmtTable) this.btnFmtTable.addEventListener('click', () => this.formatTable());
+  }
 
+  setupExportEvents() {
     // Export dropdown
     if (this.btnExportToggle) {
       this.btnExportToggle.addEventListener('click', (e) => {
@@ -363,68 +373,107 @@ class MDViewerExtensionApp extends MDViewerBase {
 
   setupKeyboardAndWindowEvents() {
     // Teclas de atalho globais
-    document.addEventListener('keydown', (e) => {
-      const isCmdOrCtrl = e.ctrlKey || e.metaKey;
-      const isEditorFocused = document.activeElement === this.sourceTextarea;
-
-      if (isCmdOrCtrl && e.key.toLowerCase() === 'n' && !e.shiftKey) {
-        e.preventDefault();
-        this.handleNewFile();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 's' && !e.shiftKey) {
-        e.preventDefault();
-        this.handleSaveFile();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'o' && !e.shiftKey) {
-        e.preventDefault();
-        this.handleOpenFile();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'w') {
-        e.preventDefault();
-        if (this.activeTabId) this.closeTab(this.activeTabId);
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'r') {
-        e.preventDefault();
-        this.reloadActiveTab();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'f') {
-        e.preventDefault();
-        this.openFindBar();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'p') {
-        e.preventDefault();
-        this.exportToPdf();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'b') {
-        if (!isEditorFocused) {
-          e.preventDefault();
-          this.toggleSidebar();
-        }
-      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
-        e.preventDefault();
-        this.switchSidebarTab('toc');
-        if (this.isSidebarCollapsed) this.toggleSidebar(true);
-      } else if (e.altKey && e.key === '1') {
-        e.preventDefault();
-        this.setViewMode('preview');
-      } else if (e.altKey && e.key === '2') {
-        e.preventDefault();
-        this.setViewMode('split');
-      } else if (e.altKey && e.key === '3') {
-        e.preventDefault();
-        this.setViewMode('source');
-      } else if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
-        e.preventDefault();
-        this.changeZoom(0.1);
-      } else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
-        e.preventDefault();
-        this.changeZoom(-0.1);
-      } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
-        e.preventDefault();
-        this.resetZoom();
-      } else if (e.key === 'F1') {
-        e.preventDefault();
-        if (this.shortcutsModal) this.shortcutsModal.classList.add('visible');
-      }
-    });
+    document.addEventListener('keydown', (e) => this.handleGlobalKeyboardEvent(e));
 
     // Auto-reload se janela recuperar foco
     window.addEventListener('focus', () => {
       this.checkActiveTabUpdates();
     });
+  }
+
+  handleGlobalKeyboardEvent(e) {
+    const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+    const isEditorFocused = document.activeElement === this.sourceTextarea;
+    const keyLower = e.key.toLowerCase();
+
+    const shortcuts = [
+      {
+        match: () => isCmdOrCtrl && keyLower === 'n' && !e.shiftKey,
+        action: () => { e.preventDefault(); this.handleNewFile(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 's' && !e.shiftKey,
+        action: () => { e.preventDefault(); this.handleSaveFile(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'o' && !e.shiftKey,
+        action: () => { e.preventDefault(); this.handleOpenFile(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'w',
+        action: () => {
+          e.preventDefault();
+          if (this.activeTabId) this.closeTab(this.activeTabId);
+        }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'r',
+        action: () => { e.preventDefault(); this.reloadActiveTab(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'f',
+        action: () => { e.preventDefault(); this.openFindBar(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'p',
+        action: () => { e.preventDefault(); this.exportToPdf(); }
+      },
+      {
+        match: () => isCmdOrCtrl && keyLower === 'b',
+        action: () => {
+          if (!isEditorFocused) {
+            e.preventDefault();
+            this.toggleSidebar();
+          }
+        }
+      },
+      {
+        match: () => isCmdOrCtrl && e.shiftKey && e.key === 'T',
+        action: () => {
+          e.preventDefault();
+          this.switchSidebarTab('toc');
+          if (this.isSidebarCollapsed) this.toggleSidebar(true);
+        }
+      },
+      {
+        match: () => e.altKey && e.key === '1',
+        action: () => { e.preventDefault(); this.setViewMode('preview'); }
+      },
+      {
+        match: () => e.altKey && e.key === '2',
+        action: () => { e.preventDefault(); this.setViewMode('split'); }
+      },
+      {
+        match: () => e.altKey && e.key === '3',
+        action: () => { e.preventDefault(); this.setViewMode('source'); }
+      },
+      {
+        match: () => isCmdOrCtrl && (e.key === '=' || e.key === '+'),
+        action: () => { e.preventDefault(); this.changeZoom(0.1); }
+      },
+      {
+        match: () => isCmdOrCtrl && e.key === '-',
+        action: () => { e.preventDefault(); this.changeZoom(-0.1); }
+      },
+      {
+        match: () => isCmdOrCtrl && e.key === '0',
+        action: () => { e.preventDefault(); this.resetZoom(); }
+      },
+      {
+        match: () => e.key === 'F1',
+        action: () => {
+          e.preventDefault();
+          if (this.shortcutsModal) this.shortcutsModal.classList.add('visible');
+        }
+      }
+    ];
+
+    for (const shortcut of shortcuts) {
+      if (shortcut.match()) {
+        shortcut.action();
+        break;
+      }
+    }
   }
 
   // File & Folder Handlers
@@ -540,19 +589,21 @@ class MDViewerExtensionApp extends MDViewerBase {
   renderFileListInExplorer(folderName, files) {
     const root = { name: folderName, isDirectory: true, children: [] };
     const folderMap = new Map();
+    const folderPrefix = folderName + '/';
 
     for (const file of files) {
       const rel = file.webkitRelativePath || file.name;
-      const parts = rel.split('/');
-      const startIndex = (parts.length > 1 && parts[0] === folderName) ? 1 : 0;
+      const startPos = rel.startsWith(folderPrefix) ? folderPrefix.length : 0;
 
       let currentLevel = root.children;
-      let accumulated = '';
+      let pos = startPos;
 
-      for (let i = startIndex; i < parts.length; i++) {
-        const part = parts[i];
-        const isFile = (i === parts.length - 1);
-        accumulated = accumulated ? accumulated + '/' + part : part;
+      while (pos < rel.length) {
+        const nextSlash = rel.indexOf('/', pos);
+        const isFile = (nextSlash === -1);
+        const endPos = isFile ? rel.length : nextSlash;
+        const part = rel.slice(pos, endPos);
+        const accumulated = rel.slice(startPos, endPos);
 
         if (isFile) {
           currentLevel.push({
@@ -578,6 +629,9 @@ class MDViewerExtensionApp extends MDViewerBase {
           }
           currentLevel = folder.children;
         }
+
+        if (isFile) break;
+        pos = nextSlash + 1;
       }
     }
 
@@ -631,8 +685,10 @@ class MDViewerExtensionApp extends MDViewerBase {
             </svg>
           </span>
           <svg class="folder-icon" viewBox="0 0 16 16" width="14" height="14" fill="#58a6ff"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z"/></svg>
-          <span class="tree-item-name" style="font-weight: 500;">${item.name}</span>
+          <span class="tree-item-name" style="font-weight: 500;"></span>
         `;
+        const nameEl = itemRow.querySelector('.tree-item-name');
+        if (nameEl) nameEl.textContent = item.name;
         li.appendChild(itemRow);
 
         if (hasChildren) {
@@ -667,8 +723,10 @@ class MDViewerExtensionApp extends MDViewerBase {
           <svg class="file-icon" viewBox="0 0 16 16" width="14" height="14" fill="#3fb950">
             <path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586a1.75 1.75 0 0 1 1.237.513l2.914 2.914c.328.328.513.774.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.06v2.69c0 .138.112.25.25.25h2.69Z"/>
           </svg>
-          <span class="tree-item-name">${item.name}</span>
+          <span class="tree-item-name"></span>
         `;
+        const nameEl = itemRow.querySelector('.tree-item-name');
+        if (nameEl) nameEl.textContent = item.name;
         itemRow.title = item.relPath || item.name;
 
         itemRow.addEventListener('click', async (e) => {
@@ -874,10 +932,18 @@ class MDViewerExtensionApp extends MDViewerBase {
       tabEl.className = `tab-item ${tab.id === this.activeTabId ? 'active' : ''} ${tab.isDirty ? 'dirty' : ''}`;
       tabEl.id = `tab-${tab.id}`;
       tabEl.title = tab.path;
-      tabEl.innerHTML = `
-        <span class="tab-title">${tab.title}</span>
-        <button class="tab-close-btn" title="Fechar aba">✕</button>
-      `;
+
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'tab-title';
+      titleSpan.textContent = tab.title;
+
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'tab-close-btn';
+      closeBtn.title = 'Fechar aba';
+      closeBtn.textContent = '✕';
+
+      tabEl.appendChild(titleSpan);
+      tabEl.appendChild(closeBtn);
 
       tabEl.addEventListener('click', (e) => {
         if (!e.target.classList.contains('tab-close-btn')) {
@@ -885,7 +951,7 @@ class MDViewerExtensionApp extends MDViewerBase {
         }
       });
 
-      tabEl.querySelector('.tab-close-btn').addEventListener('click', (e) => {
+      closeBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         this.closeTab(tab.id);
       });
@@ -913,7 +979,11 @@ class MDViewerExtensionApp extends MDViewerBase {
   activateTab(tabId) {
     this.activeTabId = tabId;
     const tab = this.tabs.find(t => t.id === tabId);
-    if (!tab) return;
+    if (!tab) {
+      this.activeTab = null;
+      return;
+    }
+    this.activeTab = tab;
 
     this.renderTabsBar();
 
@@ -980,6 +1050,7 @@ class MDViewerExtensionApp extends MDViewerBase {
         this.activateTab(nextTab.id);
       } else {
         this.activeTabId = null;
+        this.activeTab = null;
         this.renderTabsBar();
         this.applyViewModePanes();
         this.statusFilePath.textContent = 'Nenhum arquivo';
@@ -998,7 +1069,11 @@ class MDViewerExtensionApp extends MDViewerBase {
   }
 
   getActiveTab() {
-    return this.tabs.find(t => t.id === this.activeTabId);
+    if (this.activeTab && this.activeTab.id === this.activeTabId) {
+      return this.activeTab;
+    }
+    this.activeTab = this.tabs.find(t => t.id === this.activeTabId) || null;
+    return this.activeTab;
   }
 
   async reloadActiveTab() {
@@ -1366,17 +1441,37 @@ class MDViewerExtensionApp extends MDViewerBase {
 
   renderRecentFiles() {
     const list = this.settings.recentFiles || [];
+    this.recentFilesList.innerHTML = '';
+
     if (list.length === 0) {
-      this.recentFilesList.innerHTML = `<li style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-top: 20px;">Nenhum arquivo recente.</li>`;
+      const li = document.createElement('li');
+      li.style.fontSize = '0.78rem';
+      li.style.color = 'var(--text-muted)';
+      li.style.textAlign = 'center';
+      li.style.marginTop = '20px';
+      li.textContent = 'Nenhum arquivo recente.';
+      this.recentFilesList.appendChild(li);
       return;
     }
 
-    this.recentFilesList.innerHTML = list.map(item => `
-      <li class="recent-item" title="${item.path}">
-        <span class="recent-title">${item.title}</span>
-        <span class="recent-path">${item.path}</span>
-      </li>
-    `).join('');
+    list.forEach(item => {
+      const li = document.createElement('li');
+      li.className = 'recent-item';
+      li.title = item.path;
+
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'recent-title';
+      titleSpan.textContent = item.title;
+
+      const pathSpan = document.createElement('span');
+      pathSpan.className = 'recent-path';
+      pathSpan.textContent = item.path;
+
+      li.appendChild(titleSpan);
+      li.appendChild(pathSpan);
+
+      this.recentFilesList.appendChild(li);
+    });
   }
 
   // Find in document
