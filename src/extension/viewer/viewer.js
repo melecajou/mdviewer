@@ -874,10 +874,18 @@ class MDViewerExtensionApp extends MDViewerBase {
       tabEl.className = `tab-item ${tab.id === this.activeTabId ? 'active' : ''} ${tab.isDirty ? 'dirty' : ''}`;
       tabEl.id = `tab-${tab.id}`;
       tabEl.title = tab.path;
-      tabEl.innerHTML = `
-        <span class="tab-title">${tab.title}</span>
-        <button class="tab-close-btn" title="Fechar aba">✕</button>
-      `;
+
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'tab-title';
+      titleSpan.textContent = tab.title;
+
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'tab-close-btn';
+      closeBtn.title = 'Fechar aba';
+      closeBtn.textContent = '✕';
+
+      tabEl.appendChild(titleSpan);
+      tabEl.appendChild(closeBtn);
 
       tabEl.addEventListener('click', (e) => {
         if (!e.target.classList.contains('tab-close-btn')) {
@@ -885,7 +893,7 @@ class MDViewerExtensionApp extends MDViewerBase {
         }
       });
 
-      tabEl.querySelector('.tab-close-btn').addEventListener('click', (e) => {
+      closeBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         this.closeTab(tab.id);
       });

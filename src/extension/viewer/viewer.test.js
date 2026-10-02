@@ -594,6 +594,17 @@ describe('MDViewerExtensionApp', () => {
       expect(app.activeTabId).toBe(app.tabs[0].id);
     });
 
+    it('should escape HTML/XSS payloads in tab titles securely', () => {
+      const maliciousTitle = '<img src="x" onerror="alert(1)">';
+      app.openDocumentTab(maliciousTitle, '# Content', 'malicious.md');
+
+      const tabTitleSpan = document.querySelector('.tab-title');
+      expect(tabTitleSpan).not.toBeNull();
+      expect(tabTitleSpan.textContent).toBe(maliciousTitle);
+      expect(tabTitleSpan.children.length).toBe(0);
+      expect(document.querySelector('#tabs-bar img')).toBeNull();
+    });
+
     it('should activate existing tab if path matches', () => {
       app.openDocumentTab('Doc1.md', '# Content', 'Doc1.md');
       const firstTabId = app.tabs[0].id;
