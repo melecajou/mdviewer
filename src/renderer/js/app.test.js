@@ -163,6 +163,40 @@ describe('MDViewerApp - bindEvents refactoring', () => {
     }).not.toThrow();
   });
 
+  it('should safely render file and folder names in file tree without XSS vulnerabilities', () => {
+    const maliciousTree = [
+      {
+        name: '<img src=x onerror=alert("xss-folder")>',
+        path: '/path/folder',
+        isDirectory: true,
+        children: [
+          {
+            name: '<script>alert("xss-file")</script>.md',
+            path: '/path/folder/file.md',
+            isDirectory: false,
+            isMarkdown: true
+          }
+        ]
+      }
+    ];
+
+    app.renderFileTree(maliciousTree);
+
+    const folderItem = app.fileTreeContainer.querySelector('.tree-folder');
+    const fileItem = app.fileTreeContainer.querySelector('.tree-file');
+
+    expect(folderItem).not.toBeNull();
+    expect(fileItem).not.toBeNull();
+
+    // Verify HTML tags were not parsed as DOM elements
+    expect(folderItem.querySelector('img')).toBeNull();
+    expect(fileItem.querySelector('script')).toBeNull();
+
+    // Verify text content matches exact raw string
+    expect(folderItem.querySelector('.tree-item-name').textContent).toBe('<img src=x onerror=alert("xss-folder")>');
+    expect(fileItem.querySelector('.tree-item-name').textContent).toBe('<script>alert("xss-file")</script>.md');
+  });
+
   it('should route dropped markdown files to openFile and folders to loadFolder', async () => {
     app.openFile = jest.fn();
     app.loadFolder = jest.fn();
@@ -196,5 +230,144 @@ describe('MDViewerApp - bindEvents refactoring', () => {
     expect(window.electronAPI.allowDroppedPath).toHaveBeenCalledWith('/home/user/my-notes');
     expect(app.loadFolder).toHaveBeenCalledWith('/home/user/my-notes', true, true);
     expect(app.openFile).not.toHaveBeenCalled();
+  });
+
+  it('should safely escape HTML in recent file names and paths to prevent XSS in renderRecentFiles', async () => {
+    const maliciousPath = '/path/to/<img src=x onerror=alert(1)>.md';
+    window.electronAPI.getSettings = jest.fn().mockResolvedValue({
+      recentFiles: [maliciousPath]
+    });
+
+    await app.renderRecentFiles();
+
+    // Ensure no img elements or unescaped tags were rendered
+    const imgElement = app.recentFilesList.querySelector('img');
+    expect(imgElement).toBeNull();
+
+    const nameSpan = app.recentFilesList.querySelector('.recent-name');
+    const pathSpan = app.recentFilesList.querySelector('.recent-path');
+
+    expect(nameSpan.textContent).toBe('<img src=x onerror=alert(1)>.md');
+    expect(pathSpan.textContent).toBe(maliciousPath);
+  });
+
+  describe('handleInitialTargets performance & behavior', () => {
+    it('should open files/folders for all targets', async () => {
+      const targets = ['/path/doc1.md', '/path/folder1', '/path/doc2.markdown'];
+      window.electronAPI.getInitialTargets = jest.fn().mockResolvedValue(targets);
+
+      app.openFile = jest.fn().mockImplementation((path) => new Promise(res => setTimeout(res, 50)));
+      app.loadFolder = jest.fn().mockImplementation((path, a, b) => new Promise(res => setTimeout(res, 50)));
+
+      const start = Date.now();
+      await app.handleInitialTargets();
+      const duration = Date.now() - start;
+
+      expect(app.openFile).toHaveBeenCalledWith('/path/doc1.md');
+      expect(app.loadFolder).toHaveBeenCalledWith('/path/folder1', true, true);
+      expect(app.openFile).toHaveBeenCalledWith('/path/doc2.markdown');
+
+      console.log(`[Baseline / Benchmark] handleInitialTargets execution time: ${duration} ms`);
+    });
+  });
+
+  describe('handleGlobalKeyboardEvent', () => {
+    beforeEach(() => {
+      app.handleNewFile = jest.fn();
+      app.handleSaveFile = jest.fn();
+      app.handleSaveFileAs = jest.fn();
+      app.handleOpenFile = jest.fn();
+      app.handleOpenFolder = jest.fn();
+      app.closeTab = jest.fn();
+      app.reloadActiveTab = jest.fn();
+      app.openFindBar = jest.fn();
+      app.toggleSidebar = jest.fn();
+      app.exportToPdf = jest.fn();
+      app.changeZoom = jest.fn();
+      app.resetZoom = jest.fn();
+      app.setViewMode = jest.fn();
+      app.closeFindBar = jest.fn();
+    });
+
+    const createKeyboardEvent = (key, opts = {}) => {
+      const e = new KeyboardEvent('keydown', { key, ...opts });
+      e.preventDefault = jest.fn();
+      return e;
+    };
+
+    it('should trigger handleNewFile on Ctrl+N', () => {
+      const e = createKeyboardEvent('n', { ctrlKey: true });
+      app.handleGlobalKeyboardEvent(e);
+      expect(e.preventDefault).toHaveBeenCalled();
+      expect(app.handleNewFile).toHaveBeenCalledTimes(1);
+    });
+
+    it('should trigger handleSaveFile on Ctrl+S', () => {
+      const e = createKeyboardEvent('s', { ctrlKey: true });
+      app.handleGlobalKeyboardEvent(e);
+      expect(e.preventDefault).toHaveBeenCalled();
+      expect(app.handleSaveFile).toHaveBeenCalledTimes(1);
+    });
+
+    it('should trigger handleSaveFileAs on Ctrl+Shift+S', () => {
+      const e = createKeyboardEvent('S', { ctrlKey: true, shiftKey: true });
+      app.handleGlobalKeyboardEvent(e);
+      expect(e.preventDefault).toHaveBeenCalled();
+      expect(app.handleSaveFileAs).toHaveBeenCalledTimes(1);
+    });
+
+    it('should trigger handleOpenFile on Ctrl+O', () => {
+      const e = createKeyboardEvent('o', { ctrlKey: true });
+      app.handleGlobalKeyboardEvent(e);
+      expect(e.preventDefault).toHaveBeenCalled();
+      expect(app.handleOpenFile).toHaveBeenCalledTimes(1);
+    });
+
+    it('should trigger handleOpenFolder on Ctrl+Shift+O', () => {
+      const e = createKeyboardEvent('O', { ctrlKey: true, shiftKey: true });
+      app.handleGlobalKeyboardEvent(e);
+      expect(e.preventDefault).toHaveBeenCalled();
+      expect(app.handleOpenFolder).toHaveBeenCalledTimes(1);
+    });
+
+    it('should trigger closeTab on Ctrl+W if active tab exists', () => {
+      app.activeTabId = 'tab_1';
+      const e = createKeyboardEvent('w', { ctrlKey: true });
+      app.handleGlobalKeyboardEvent(e);
+      expect(e.preventDefault).toHaveBeenCalled();
+      expect(app.closeTab).toHaveBeenCalledWith('tab_1');
+    });
+
+    it('should trigger setViewMode on Alt+1, Alt+2, Alt+3', () => {
+      const e1 = createKeyboardEvent('1', { altKey: true });
+      app.handleGlobalKeyboardEvent(e1);
+      expect(app.setViewMode).toHaveBeenCalledWith('preview');
+
+      const e2 = createKeyboardEvent('2', { altKey: true });
+      app.handleGlobalKeyboardEvent(e2);
+      expect(app.setViewMode).toHaveBeenCalledWith('split');
+
+      const e3 = createKeyboardEvent('3', { altKey: true });
+      app.handleGlobalKeyboardEvent(e3);
+      expect(app.setViewMode).toHaveBeenCalledWith('source');
+    });
+
+    it('should open shortcuts modal on F1', () => {
+      const e = createKeyboardEvent('F1');
+      app.handleGlobalKeyboardEvent(e);
+      expect(e.preventDefault).toHaveBeenCalled();
+      expect(app.shortcutsModal.classList.contains('visible')).toBe(true);
+    });
+
+    it('should close modals and find bar on Escape', () => {
+      app.shortcutsModal.classList.add('visible');
+      app.lightboxModal.classList.add('visible');
+      const e = createKeyboardEvent('Escape');
+      app.handleGlobalKeyboardEvent(e);
+
+      expect(app.shortcutsModal.classList.contains('visible')).toBe(false);
+      expect(app.lightboxModal.classList.contains('visible')).toBe(false);
+      expect(app.closeFindBar).toHaveBeenCalledTimes(1);
+    });
   });
 });

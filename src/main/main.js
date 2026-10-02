@@ -917,8 +917,10 @@ if (process.env.NODE_ENV === 'test') {
   module.exports = {
     addAllowedPath,
     allowedPaths,
+    isIgnoredArg,
     isPathAllowed,
     isSystemOrRootDirectory,
+    normalizeCliArg,
     parseCommandLineArgs,
     _clearAllowedPaths: () => allowedPaths.clear()
   };
