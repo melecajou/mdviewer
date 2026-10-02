@@ -15,6 +15,10 @@ class MDViewerBase {
     this.isSyncingScroll = false;
   }
 
+  getActiveTab() {
+    return this.tabs.find(t => t.id === this.activeTabId);
+  }
+
   initMermaid() {
     if (window.mermaid) {
       const isDark = !document.documentElement.getAttribute('data-theme')?.includes('light');

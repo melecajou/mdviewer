@@ -502,7 +502,7 @@ class MDViewerApp extends _MDViewerBase {
   // ---------------- File & Tab Operations ----------------
 
   async handleOpenFile() {
-    const currentTab = this.tabs.find(t => t.id === this.activeTabId);
+    const currentTab = this.getActiveTab();
     const preferredDir = currentTab ? currentTab.dirName : this.currentFolder;
     const filePath = await window.electronAPI.openFileDialog(preferredDir);
     if (filePath) {
@@ -576,7 +576,7 @@ class MDViewerApp extends _MDViewerBase {
 
   switchTab(tabId) {
     // Save current scroll position
-    const currentTab = this.tabs.find(t => t.id === this.activeTabId);
+    const currentTab = this.getActiveTab();
     if (currentTab) {
       currentTab.scrollPos = this.previewPane.scrollTop;
       const currentTabEl = document.getElementById(`tab-el-${currentTab.id}`);
@@ -713,13 +713,13 @@ class MDViewerApp extends _MDViewerBase {
   }
 
   async handleSaveFile() {
-    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    const activeTab = this.getActiveTab();
     if (!activeTab) return;
     return await this.saveTab(activeTab);
   }
 
   async handleSaveFileAs() {
-    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    const activeTab = this.getActiveTab();
     if (!activeTab) return;
     return await this.saveTabAs(activeTab);
   }
@@ -787,7 +787,7 @@ class MDViewerApp extends _MDViewerBase {
   }
 
   handleEditorInput() {
-    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    const activeTab = this.getActiveTab();
     if (!activeTab) return;
 
     activeTab.content = this.sourceTextarea.value;
@@ -803,7 +803,7 @@ class MDViewerApp extends _MDViewerBase {
   }
 
   toggleTaskCheckbox(taskIndex, isChecked) {
-    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    const activeTab = this.getActiveTab();
     if (!activeTab) return;
 
     let currentIndex = 0;
@@ -1002,7 +1002,7 @@ class MDViewerApp extends _MDViewerBase {
   // ---------------- File Explorer & Folder Navigation ----------------
 
   async handleOpenFolder() {
-    const currentTab = this.tabs.find(t => t.id === this.activeTabId);
+    const currentTab = this.getActiveTab();
     const preferredDir = this.currentFolder || (currentTab ? currentTab.dirName : null);
     const folderPath = await window.electronAPI.openFolderDialog(preferredDir);
     if (folderPath) {
@@ -1216,7 +1216,7 @@ class MDViewerApp extends _MDViewerBase {
         });
 
         // Highlight if already open
-        const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+        const activeTab = this.getActiveTab();
         if (activeTab && activeTab.filePath === item.path) {
           itemRow.classList.add('active');
         }
@@ -1233,7 +1233,7 @@ class MDViewerApp extends _MDViewerBase {
   filterFileTree(query) {
     if (!query) {
       this.renderFileTree(this.currentTree, null, true);
-      const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+      const activeTab = this.getActiveTab();
       if (activeTab) {
         this.updateActiveTreeItem(activeTab.filePath);
       }
@@ -1258,7 +1258,7 @@ class MDViewerApp extends _MDViewerBase {
 
     const filtered = filterNodes(this.currentTree);
     this.renderFileTree(filtered, null, false);
-    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    const activeTab = this.getActiveTab();
     if (activeTab) {
       this.updateActiveTreeItem(activeTab.filePath);
     }
@@ -1374,7 +1374,7 @@ class MDViewerApp extends _MDViewerBase {
     
     // Re-init Mermaid with matching theme
     this.initMermaid();
-    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    const activeTab = this.getActiveTab();
     if (activeTab) {
       this.renderMarkdown(activeTab);
     }
@@ -1509,14 +1509,14 @@ class MDViewerApp extends _MDViewerBase {
   // ---------------- Exporting ----------------
 
   async exportToPdf() {
-    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    const activeTab = this.getActiveTab();
     const defaultName = activeTab ? activeTab.fileName.replace(/\.[^/.]+$/, '') + '.pdf' : 'documento.pdf';
     const preferredDir = activeTab ? activeTab.dirName : this.currentFolder;
     await window.electronAPI.exportPdf({ defaultName, defaultDir: preferredDir });
   }
 
   async exportToHtml() {
-    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    const activeTab = this.getActiveTab();
     if (!activeTab) return;
 
     const defaultName = activeTab.fileName.replace(/\.[^/.]+$/, '') + '.html';
