@@ -1023,6 +1023,22 @@ describe('MDViewerExtensionApp', () => {
       spyKeyboardWindow.mockRestore();
     });
 
+    it('setupFileAndToolbarEvents should invoke helper setup methods', () => {
+      const spyFileActions = jest.spyOn(MDViewerExtensionApp.prototype, 'setupFileActionEvents').mockImplementation(() => {});
+      const spyFormattingToolbar = jest.spyOn(MDViewerExtensionApp.prototype, 'setupFormattingToolbarEvents').mockImplementation(() => {});
+      const spyExportEvents = jest.spyOn(MDViewerExtensionApp.prototype, 'setupExportEvents').mockImplementation(() => {});
+
+      app.setupFileAndToolbarEvents();
+
+      expect(spyFileActions).toHaveBeenCalled();
+      expect(spyFormattingToolbar).toHaveBeenCalled();
+      expect(spyExportEvents).toHaveBeenCalled();
+
+      spyFileActions.mockRestore();
+      spyFormattingToolbar.mockRestore();
+      spyExportEvents.mockRestore();
+    });
+
     it('setupSidebarEvents should attach click handler to btnToggleSidebar', () => {
       const toggleSpy = jest.spyOn(app, 'toggleSidebar').mockImplementation(() => {});
 

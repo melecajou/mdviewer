@@ -199,6 +199,12 @@ class MDViewerExtensionApp extends MDViewerBase {
   }
 
   setupFileAndToolbarEvents() {
+    this.setupFileActionEvents();
+    this.setupFormattingToolbarEvents();
+    this.setupExportEvents();
+  }
+
+  setupFileActionEvents() {
     // File New, Open & Save buttons
     if (this.btnNewFile) this.btnNewFile.addEventListener('click', () => this.handleNewFile());
     if (this.btnOpenFile) this.btnOpenFile.addEventListener('click', () => this.handleOpenFile());
@@ -216,7 +222,9 @@ class MDViewerExtensionApp extends MDViewerBase {
         this.hiddenFileInput.value = '';
       });
     }
+  }
 
+  setupFormattingToolbarEvents() {
     // Formatting Toolbar buttons
     if (this.btnFmtBold) this.btnFmtBold.addEventListener('click', () => this.formatWrap('**', '**', 'negrito'));
     if (this.btnFmtItalic) this.btnFmtItalic.addEventListener('click', () => this.formatWrap('*', '*', 'itálico'));
@@ -231,7 +239,9 @@ class MDViewerExtensionApp extends MDViewerBase {
     if (this.btnFmtLink) this.btnFmtLink.addEventListener('click', () => this.formatLink());
     if (this.btnFmtImage) this.btnFmtImage.addEventListener('click', () => this.formatImage());
     if (this.btnFmtTable) this.btnFmtTable.addEventListener('click', () => this.formatTable());
+  }
 
+  setupExportEvents() {
     // Export dropdown
     if (this.btnExportToggle) {
       this.btnExportToggle.addEventListener('click', (e) => {
