@@ -46,11 +46,57 @@ jest.mock('./file-watcher', () => {
 const fs = require('fs');
 const path = require('path');
 const { ipcMain, shell } = require('electron');
-const { parseCommandLineArgs, addAllowedPath, allowedPaths, isIgnoredArg, isPathAllowed, isSystemOrRootDirectory, _clearAllowedPaths } = require('./main');
+const { normalizeCliArg, parseCommandLineArgs, addAllowedPath, allowedPaths, isIgnoredArg, isPathAllowed, isSystemOrRootDirectory, _clearAllowedPaths } = require('./main');
 
 const ipcMainHandlers = new Map(ipcMain.handle.mock.calls);
 const openExternalHandler = ipcMainHandlers.get('shell:open-external');
 const allowDroppedPathHandler = ipcMainHandlers.get('app:allow-dropped-path');
+
+describe('normalizeCliArg', () => {
+  let originalPlatform;
+
+  beforeAll(() => {
+    originalPlatform = process.platform;
+  });
+
+  afterAll(() => {
+    Object.defineProperty(process, 'platform', {
+      value: originalPlatform
+    });
+  });
+
+  it('should return argument unchanged if it does not start with file://', () => {
+    expect(normalizeCliArg('/path/to/file.md')).toBe('/path/to/file.md');
+    expect(normalizeCliArg('C:\\path\\to\\file.md')).toBe('C:\\path\\to\\file.md');
+    expect(normalizeCliArg('relative/file.md')).toBe('relative/file.md');
+    expect(normalizeCliArg('--flag')).toBe('--flag');
+    expect(normalizeCliArg('http://example.com/file.md')).toBe('http://example.com/file.md');
+  });
+
+  it('should decode URL-encoded characters in file:// URIs', () => {
+    expect(normalizeCliArg('file:///path/to/my%20document.md')).toBe('/path/to/my document.md');
+    expect(normalizeCliArg('file:///docs/special%23file.md')).toBe('/docs/special#file.md');
+    expect(normalizeCliArg('file:///docs/100%25test.md')).toBe('/docs/100%test.md');
+  });
+
+  it('should preserve leading slash on POSIX platforms for drive-like patterns', () => {
+    Object.defineProperty(process, 'platform', { value: 'linux' });
+    expect(normalizeCliArg('file:///C:/Users/Test/file.md')).toBe('/C:/Users/Test/file.md');
+  });
+
+  it('should strip leading slash for Windows drive letters on win32 platform', () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    expect(normalizeCliArg('file:///C:/Users/Test/file.md')).toBe('C:/Users/Test/file.md');
+    expect(normalizeCliArg('file:///d:/documents/notes%20file.md')).toBe('d:/documents/notes file.md');
+    expect(normalizeCliArg('file:///E:/path/without/drive')).toBe('E:/path/without/drive');
+  });
+
+  it('should fallback to stripping file:// prefix if URL parsing or URI decoding fails', () => {
+    // Malformed URL causes new URL() to throw an error, triggering catch block fallback
+    const malformedUri = 'file://[';
+    expect(normalizeCliArg(malformedUri)).toBe('[');
+  });
+});
 
 describe('parseCommandLineArgs', () => {
   let originalPlatform;
