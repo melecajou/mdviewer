@@ -631,8 +631,10 @@ class MDViewerExtensionApp extends MDViewerBase {
             </svg>
           </span>
           <svg class="folder-icon" viewBox="0 0 16 16" width="14" height="14" fill="#58a6ff"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z"/></svg>
-          <span class="tree-item-name" style="font-weight: 500;">${item.name}</span>
+          <span class="tree-item-name" style="font-weight: 500;"></span>
         `;
+        const nameEl = itemRow.querySelector('.tree-item-name');
+        if (nameEl) nameEl.textContent = item.name;
         li.appendChild(itemRow);
 
         if (hasChildren) {
@@ -667,8 +669,10 @@ class MDViewerExtensionApp extends MDViewerBase {
           <svg class="file-icon" viewBox="0 0 16 16" width="14" height="14" fill="#3fb950">
             <path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586a1.75 1.75 0 0 1 1.237.513l2.914 2.914c.328.328.513.774.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.06v2.69c0 .138.112.25.25.25h2.69Z"/>
           </svg>
-          <span class="tree-item-name">${item.name}</span>
+          <span class="tree-item-name"></span>
         `;
+        const nameEl = itemRow.querySelector('.tree-item-name');
+        if (nameEl) nameEl.textContent = item.name;
         itemRow.title = item.relPath || item.name;
 
         itemRow.addEventListener('click', async (e) => {

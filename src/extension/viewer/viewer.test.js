@@ -736,6 +736,42 @@ describe('MDViewerExtensionApp', () => {
       consoleSpy.mockRestore();
     });
 
+    it('should safely render file and folder names in tree without XSS vulnerabilities', () => {
+      const maliciousTree = [
+        {
+          name: '<img src=x onerror=alert("xss-dir")>',
+          relPath: 'dir',
+          path: 'dir',
+          isDirectory: true,
+          children: [
+            {
+              name: '<script>alert("xss-file")</script>.md',
+              relPath: 'dir/file.md',
+              path: 'dir/file.md',
+              isDirectory: false,
+              isMarkdown: true
+            }
+          ]
+        }
+      ];
+
+      app.renderTreeNodes(maliciousTree);
+
+      const folderItem = app.fileTreeContainer.querySelector('.tree-folder');
+      const fileItem = app.fileTreeContainer.querySelector('.tree-file');
+
+      expect(folderItem).not.toBeNull();
+      expect(fileItem).not.toBeNull();
+
+      // Verify HTML tags were not parsed as DOM elements
+      expect(folderItem.querySelector('img')).toBeNull();
+      expect(fileItem.querySelector('script')).toBeNull();
+
+      // Verify text content matches exact raw string
+      expect(folderItem.querySelector('.tree-item-name').textContent).toBe('<img src=x onerror=alert("xss-dir")>');
+      expect(fileItem.querySelector('.tree-item-name').textContent).toBe('<script>alert("xss-file")</script>.md');
+    });
+
     it('should read file object via readFileObject', async () => {
       const mockFile = { name: 'ReadObj.md', text: jest.fn().mockResolvedValue('# Read Obj') };
       await app.readFileObject(mockFile);
