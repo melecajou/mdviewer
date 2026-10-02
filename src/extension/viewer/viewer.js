@@ -1384,17 +1384,37 @@ class MDViewerExtensionApp extends MDViewerBase {
 
   renderRecentFiles() {
     const list = this.settings.recentFiles || [];
+    this.recentFilesList.innerHTML = '';
+
     if (list.length === 0) {
-      this.recentFilesList.innerHTML = `<li style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-top: 20px;">Nenhum arquivo recente.</li>`;
+      const li = document.createElement('li');
+      li.style.fontSize = '0.78rem';
+      li.style.color = 'var(--text-muted)';
+      li.style.textAlign = 'center';
+      li.style.marginTop = '20px';
+      li.textContent = 'Nenhum arquivo recente.';
+      this.recentFilesList.appendChild(li);
       return;
     }
 
-    this.recentFilesList.innerHTML = list.map(item => `
-      <li class="recent-item" title="${item.path}">
-        <span class="recent-title">${item.title}</span>
-        <span class="recent-path">${item.path}</span>
-      </li>
-    `).join('');
+    list.forEach(item => {
+      const li = document.createElement('li');
+      li.className = 'recent-item';
+      li.title = item.path;
+
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'recent-title';
+      titleSpan.textContent = item.title;
+
+      const pathSpan = document.createElement('span');
+      pathSpan.className = 'recent-path';
+      pathSpan.textContent = item.path;
+
+      li.appendChild(titleSpan);
+      li.appendChild(pathSpan);
+
+      this.recentFilesList.appendChild(li);
+    });
   }
 
   // Find in document

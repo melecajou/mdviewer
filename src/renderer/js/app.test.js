@@ -231,4 +231,23 @@ describe('MDViewerApp - bindEvents refactoring', () => {
     expect(app.loadFolder).toHaveBeenCalledWith('/home/user/my-notes', true, true);
     expect(app.openFile).not.toHaveBeenCalled();
   });
+
+  it('should safely escape HTML in recent file names and paths to prevent XSS in renderRecentFiles', async () => {
+    const maliciousPath = '/path/to/<img src=x onerror=alert(1)>.md';
+    window.electronAPI.getSettings = jest.fn().mockResolvedValue({
+      recentFiles: [maliciousPath]
+    });
+
+    await app.renderRecentFiles();
+
+    // Ensure no img elements or unescaped tags were rendered
+    const imgElement = app.recentFilesList.querySelector('img');
+    expect(imgElement).toBeNull();
+
+    const nameSpan = app.recentFilesList.querySelector('.recent-name');
+    const pathSpan = app.recentFilesList.querySelector('.recent-path');
+
+    expect(nameSpan.textContent).toBe('<img src=x onerror=alert(1)>.md');
+    expect(pathSpan.textContent).toBe(maliciousPath);
+  });
 });
