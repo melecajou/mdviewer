@@ -913,7 +913,11 @@ class MDViewerExtensionApp extends MDViewerBase {
   activateTab(tabId) {
     this.activeTabId = tabId;
     const tab = this.tabs.find(t => t.id === tabId);
-    if (!tab) return;
+    if (!tab) {
+      this.activeTab = null;
+      return;
+    }
+    this.activeTab = tab;
 
     this.renderTabsBar();
 
@@ -980,6 +984,7 @@ class MDViewerExtensionApp extends MDViewerBase {
         this.activateTab(nextTab.id);
       } else {
         this.activeTabId = null;
+        this.activeTab = null;
         this.renderTabsBar();
         this.applyViewModePanes();
         this.statusFilePath.textContent = 'Nenhum arquivo';
@@ -998,7 +1003,11 @@ class MDViewerExtensionApp extends MDViewerBase {
   }
 
   getActiveTab() {
-    return this.tabs.find(t => t.id === this.activeTabId);
+    if (this.activeTab && this.activeTab.id === this.activeTabId) {
+      return this.activeTab;
+    }
+    this.activeTab = this.tabs.find(t => t.id === this.activeTabId) || null;
+    return this.activeTab;
   }
 
   async reloadActiveTab() {
