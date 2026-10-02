@@ -93,17 +93,18 @@ describe('Content script (content.js) - Security & Sanitization', () => {
     expect(renderedContent.innerHTML).not.toContain('<img src=x onerror=alert(1)>');
   });
 
-  it('should safely escape malicious filenames in the floating toolbar', () => {
-    window.history.pushState({}, 'Test', '/%3Cimg%20src=x%20onerror=alert(1)%3E.md');
+  it('should escape malicious HTML and XSS payloads in filename in toolbar', () => {
+    const maliciousFilename = '<img src=x onerror=alert(1)>.md';
+    window.history.pushState({}, 'Test', '/' + encodeURIComponent(maliciousFilename));
     Object.defineProperty(document, 'contentType', {
       value: 'text/markdown',
       configurable: true
     });
-    document.body.innerHTML = '<pre># Test</pre>';
+    document.body.innerHTML = '<pre># Test Document</pre>';
 
     window.MDViewerEngine = {
       parseMarkdown: jest.fn(() => ({
-        html: '<h1>Test</h1>',
+        html: '<h1>Test Document</h1>',
         headings: []
       }))
     };
@@ -115,7 +116,10 @@ describe('Content script (content.js) - Security & Sanitization', () => {
 
     const titleEl = document.querySelector('.mdviewer-doc-title');
     expect(titleEl).not.toBeNull();
+    expect(titleEl.querySelector('img')).toBeNull();
     expect(titleEl.innerHTML).not.toContain('<img');
     expect(titleEl.innerHTML).toContain('&lt;img src=x onerror=alert(1)&gt;.md');
+    expect(titleEl.textContent).toBe(maliciousFilename);
+    expect(titleEl.getAttribute('title')).toBe(maliciousFilename);
   });
 });
