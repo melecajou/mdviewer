@@ -1242,16 +1242,37 @@ class MDViewerApp extends _MDViewerBase {
     const q = query.toLowerCase();
 
     function filterNodes(nodes) {
+      let modified = false;
       const result = [];
-      for (const node of nodes) {
+      for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
         if (node.isDirectory) {
-          const matchingChildren = filterNodes(node.children || []);
-          if (matchingChildren.length > 0 || node.name.toLowerCase().includes(q)) {
-            result.push({ ...node, children: matchingChildren });
+          const children = node.children || [];
+          const matchingChildren = filterNodes(children);
+          const hasMatchingChildren = matchingChildren.length > 0;
+          const nameMatches = node.name.toLowerCase().includes(q);
+
+          if (hasMatchingChildren || nameMatches) {
+            if (matchingChildren === children) {
+              result.push(node);
+            } else {
+              modified = true;
+              result.push({ ...node, children: matchingChildren });
+            }
+          } else {
+            modified = true;
           }
-        } else if (node.name.toLowerCase().includes(q)) {
-          result.push(node);
+        } else {
+          if (node.name.toLowerCase().includes(q)) {
+            result.push(node);
+          } else {
+            modified = true;
+          }
         }
+      }
+
+      if (!modified && result.length === nodes.length) {
+        return nodes;
       }
       return result;
     }
