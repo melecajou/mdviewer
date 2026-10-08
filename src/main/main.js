@@ -192,6 +192,7 @@ if (!gotTheLock) {
 
   app.whenReady().then(async () => {
     await store.init();
+    await loadIconConfig();
 
     // Initialize Allowed Paths from store and other known locations
     const allSettings = store.getAll();
@@ -232,13 +233,50 @@ if (!gotTheLock) {
   });
 }
 
-function createWindow() {
-  const savedBounds = store.get('windowBounds') || {};
+let cachedIconConfig = null;
+
+async function loadIconConfig() {
+  if (cachedIconConfig) return cachedIconConfig;
+  const isWin = process.platform === 'win32';
+  const icoPath = path.join(__dirname, '../assets/icon.ico');
+  const pngPath = path.join(__dirname, '../assets/icon.png');
+
+  let pngExists = false;
+  try {
+    await fs.promises.access(pngPath);
+    pngExists = true;
+  } catch {}
+
+  let icoExists = false;
+  if (isWin) {
+    try {
+      await fs.promises.access(icoPath);
+      icoExists = true;
+    } catch {}
+  }
+
+  const iconImg = pngExists ? nativeImage.createFromPath(pngPath) : undefined;
+  const iconPath = (isWin && icoExists) ? icoPath : (iconImg || pngPath);
+
+  cachedIconConfig = { iconImg, iconPath };
+  return cachedIconConfig;
+}
+
+function getIconConfigSync() {
+  if (cachedIconConfig) return cachedIconConfig;
   const isWin = process.platform === 'win32';
   const icoPath = path.join(__dirname, '../assets/icon.ico');
   const pngPath = path.join(__dirname, '../assets/icon.png');
   const iconImg = fs.existsSync(pngPath) ? nativeImage.createFromPath(pngPath) : undefined;
   const iconPath = (isWin && fs.existsSync(icoPath)) ? icoPath : (iconImg || pngPath);
+
+  cachedIconConfig = { iconImg, iconPath };
+  return cachedIconConfig;
+}
+
+function createWindow() {
+  const savedBounds = store.get('windowBounds') || {};
+  const { iconImg, iconPath } = getIconConfigSync();
 
   mainWindow = new BrowserWindow({
     width: savedBounds.width || 1200,
@@ -922,6 +960,9 @@ if (process.env.NODE_ENV === 'test') {
     isSystemOrRootDirectory,
     normalizeCliArg,
     parseCommandLineArgs,
-    _clearAllowedPaths: () => allowedPaths.clear()
+    loadIconConfig,
+    getIconConfigSync,
+    _clearAllowedPaths: () => allowedPaths.clear(),
+    _resetCachedIconConfig: () => { cachedIconConfig = null; }
   };
 }
