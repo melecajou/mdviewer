@@ -1259,7 +1259,7 @@ class MDViewerExtensionApp extends MDViewerBase {
     const { html, headings, stats } = parsed;
 
     // Inject HTML (Sanitized to prevent XSS)
-    const purify = window.DOMPurify || (typeof DOMPurify !== 'undefined' ? DOMPurify : null);
+    const purify = typeof DOMPurify !== 'undefined' ? DOMPurify : null;
     if (!purify || typeof purify.sanitize !== 'function') {
       throw new Error('DOMPurify library is required for rendering markdown content securely.');
     }
