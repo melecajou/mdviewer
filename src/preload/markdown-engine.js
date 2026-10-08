@@ -406,7 +406,13 @@ function parseMarkdown(rawContent) {
   };
 }
 
-module.exports = {
+const exportsObj = {
   parseMarkdown,
   slugify
 };
+
+if (process.env.NODE_ENV === 'test') {
+  exportsObj.processMath = processMath;
+}
+
+module.exports = exportsObj;
