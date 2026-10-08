@@ -217,14 +217,7 @@
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         const code = decodeURIComponent(btn.getAttribute('data-code') || '');
-        navigator.clipboard.writeText(code).then(() => {
-          const span = btn.querySelector('.copy-text');
-          if (span) {
-            const original = span.textContent;
-            span.textContent = 'Copiado!';
-            setTimeout(() => { span.textContent = original; }, 1800);
-          }
-        });
+        MDViewerBase.prototype.copyToClipboard(code, { button: btn, copiedText: 'Copiado!', timeout: 1800 });
       });
     });
   }
