@@ -139,6 +139,32 @@ describe('Extension Viewer Sanitization', () => {
       app.renderMarkdown('<h1>Title</h1>');
     }).toThrow('DOMPurify library is required for rendering markdown content securely.');
   });
+
+  it('should safely render error message and stack without XSS when parseMarkdown throws', () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const maliciousErr = new Error('<img src=x onerror=alert("xss-msg")>');
+    maliciousErr.stack = 'Error: <script>alert("xss-stack")</script>\n  at parseMarkdown';
+
+    window.MDViewerEngine = {
+      parseMarkdown: () => {
+        throw maliciousErr;
+      }
+    };
+
+    app.renderMarkdown('# Test Content');
+
+    const container = document.getElementById('markdown-container');
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('script')).toBeNull();
+
+    const p = container.querySelector('p');
+    const pre = container.querySelector('pre');
+
+    expect(p.textContent).toBe('<img src=x onerror=alert("xss-msg")>');
+    expect(pre.textContent).toBe('Error: <script>alert("xss-stack")</script>\n  at parseMarkdown');
+
+    consoleSpy.mockRestore();
+  });
 });
 
 // Load extension script using Function evaluator
