@@ -13,6 +13,7 @@ let mainWindow = null;
 const store = new Store();
 let watcherManager = null;
 
+const MARKDOWN_EXTENSIONS = new Set(['.md', '.markdown', '.mdown', '.mkd', '.mdx', '.txt']);
 const allowedPaths = new Set();
 
 function addAllowedPath(p) {
@@ -698,7 +699,7 @@ ipcMain.handle('file:read-dir', async (event, dirPath) => {
           };
         } else {
           const ext = path.extname(entry.name).toLowerCase();
-          const isMd = ['.md', '.markdown', '.mdown', '.mkd', '.mdx', '.txt'].includes(ext);
+          const isMd = MARKDOWN_EXTENSIONS.has(ext);
           return {
             name: entry.name,
             path: fullPath,
@@ -914,8 +915,7 @@ ipcMain.handle('app:allow-dropped-path', async (event, targetPath) => {
       return true;
     } else if (stats.isFile()) {
       const ext = path.extname(resolvedPath).toLowerCase();
-      const allowedExtensions = ['.md', '.markdown', '.mdown', '.mkd', '.mdx', '.txt'];
-      if (!allowedExtensions.includes(ext)) {
+      if (!MARKDOWN_EXTENSIONS.has(ext)) {
         return false;
       }
 
