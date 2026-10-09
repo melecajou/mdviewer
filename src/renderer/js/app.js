@@ -916,13 +916,12 @@ class MDViewerApp extends _MDViewerBase {
     copyButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         const rawCode = decodeURIComponent(btn.dataset.code || '');
-        navigator.clipboard.writeText(rawCode).then(() => {
-          btn.classList.add('copied');
-          btn.querySelector('.copy-text').textContent = 'Copiado!';
-          setTimeout(() => {
-            btn.classList.remove('copied');
-            btn.querySelector('.copy-text').textContent = 'Copiar';
-          }, 1500);
+        this.copyToClipboard(rawCode, {
+          button: btn,
+          copiedText: 'Copiado!',
+          originalText: 'Copiar',
+          copiedClass: 'copied',
+          timeout: 1500
         });
       });
     });
