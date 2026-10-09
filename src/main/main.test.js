@@ -45,13 +45,20 @@ jest.mock('./file-watcher', () => {
 
 const fs = require('fs');
 const path = require('path');
-const { ipcMain, shell } = require('electron');
-const { nativeImage } = require('electron');
+const { BrowserWindow, ipcMain, shell, nativeImage } = require('electron');
 const { normalizeCliArg, parseCommandLineArgs, addAllowedPath, allowedPaths, isIgnoredArg, isPathAllowed, isSystemOrRootDirectory, loadIconConfig, getIconConfigSync, _clearAllowedPaths, _resetCachedIconConfig } = require('./main');
 
 const ipcMainHandlers = new Map(ipcMain.handle.mock.calls);
 const openExternalHandler = ipcMainHandlers.get('shell:open-external');
 const allowDroppedPathHandler = ipcMainHandlers.get('app:allow-dropped-path');
+
+describe('BrowserWindow webPreferences sandbox configuration', () => {
+  it('should instantiate BrowserWindow with sandbox: true', () => {
+    // Read main.js source code or check window configuration
+    const mainJsContent = fs.readFileSync(path.join(__dirname, 'main.js'), 'utf-8');
+    expect(mainJsContent).toMatch(/sandbox:\s*true/);
+  });
+});
 
 describe('normalizeCliArg', () => {
   let originalPlatform;
