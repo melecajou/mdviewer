@@ -1,5 +1,6 @@
 const hljs = require('highlight.js');
-const { slugify, parseMarkdown, splitHighlightedLines } = require('./markdown-engine');
+const katex = require('katex');
+const { slugify, parseMarkdown, splitHighlightedLines, processMath } = require('./markdown-engine');
 
 describe('slugify', () => {
   test('should lowercase text', () => {
@@ -183,6 +184,137 @@ describe('parseMarkdown', () => {
     expect(result.stats.chars).toBe(markdown.length);
     expect(result.stats.lines).toBe(markdown.split('\n').length);
     expect(result.stats.readTimeMinutes).toBe(1);
+  });
+});
+
+describe('processMath', () => {
+  test('should process block math ($$...$$) and restore rendered KaTeX HTML', () => {
+    const markdown = 'Here is a formula:\n\n$$\\frac{a}{b}$$\n\nEnd.';
+    const { markdown: processed, restoreMath } = processMath(markdown);
+
+    expect(processed).toContain('%%MATH_BLOCK_0%%');
+    expect(processed).not.toContain('$$\\frac{a}{b}$$');
+
+    const htmlWithPlaceholder = `<p>Here is a formula:</p><p>%%MATH_BLOCK_0%%</p><p>End.</p>`;
+    const restoredHtml = restoreMath(htmlWithPlaceholder);
+
+    expect(restoredHtml).toContain('<div class="katex-block">');
+    expect(restoredHtml).toContain('katex');
+    expect(restoredHtml).not.toContain('%%MATH_BLOCK_0%%');
+  });
+
+  test('should process inline math ($...$) and restore rendered KaTeX HTML', () => {
+    const markdown = 'Inline math $E=mc^2$ here.';
+    const { markdown: processed, restoreMath } = processMath(markdown);
+
+    expect(processed).toContain('%%MATH_INLINE_0%%');
+    expect(processed).not.toContain('$E=mc^2$');
+
+    const htmlWithPlaceholder = `<p>Inline math %%MATH_INLINE_0%% here.</p>`;
+    const restoredHtml = restoreMath(htmlWithPlaceholder);
+
+    expect(restoredHtml).toContain('<span class="katex-inline">');
+    expect(restoredHtml).toContain('katex');
+    expect(restoredHtml).not.toContain('%%MATH_INLINE_0%%');
+  });
+
+  test('should protect fenced code blocks from math processing', () => {
+    const markdown = '```js\nconst price = "$100";\nconst formula = "$a + b$";\n```\n\nInline $x + y = z$';
+    const { markdown: processed, restoreMath } = processMath(markdown);
+
+    expect(processed).toContain('```js\nconst price = "$100";\nconst formula = "$a + b$";\n```');
+    expect(processed).toContain('%%MATH_INLINE_0%%');
+
+    const restoredHtml = restoreMath(processed);
+    expect(restoredHtml).toContain('const formula = "$a + b$";');
+  });
+
+  test('should protect inline code from math processing', () => {
+    const markdown = 'Use `$x + y$` in inline code and $a^2$ in math.';
+    const { markdown: processed, restoreMath } = processMath(markdown);
+
+    expect(processed).toContain('`$x + y$`');
+    expect(processed).toContain('%%MATH_INLINE_0%%');
+
+    const restoredHtml = restoreMath(processed);
+    expect(restoredHtml).toContain('`$x + y$`');
+  });
+
+  test('should ignore pure numbers wrapped in $ as inline math', () => {
+    const markdown = 'Item costs $50$ or $100.00$.';
+    const { markdown: processed, restoreMath } = processMath(markdown);
+
+    expect(processed).toBe(markdown);
+    expect(processed).not.toContain('%%MATH_INLINE');
+
+    const restored = restoreMath(processed);
+    expect(restored).toBe(markdown);
+  });
+
+  test('should ignore escaped dollar signs as inline math', () => {
+    const markdown = 'This costs \\$50 or \\$100.00.';
+    const { markdown: processed, restoreMath } = processMath(markdown);
+
+    expect(processed).toBe(markdown);
+    expect(processed).not.toContain('%%MATH_INLINE');
+
+    const restored = restoreMath(processed);
+    expect(restored).toBe(markdown);
+  });
+
+  test('should handle multiple block and inline math expressions', () => {
+    const markdown = 'First $a$, second $b$, and block:\n\n$$c$$\n\nand block:\n\n$$d$$';
+    const { markdown: processed, restoreMath } = processMath(markdown);
+
+    expect(processed).toContain('%%MATH_INLINE_0%%');
+    expect(processed).toContain('%%MATH_INLINE_1%%');
+    expect(processed).toContain('%%MATH_BLOCK_0%%');
+    expect(processed).toContain('%%MATH_BLOCK_1%%');
+
+    const restoredHtml = restoreMath(processed);
+    expect(restoredHtml).not.toContain('%%MATH_');
+    expect(restoredHtml).toContain('<span class="katex-inline">');
+    expect(restoredHtml).toContain('<div class="katex-block">');
+  });
+
+  test('should handle katex rendering errors gracefully for block math', () => {
+    const katexSpy = jest.spyOn(katex, 'renderToString').mockImplementation(() => {
+      throw new Error('KaTeX error');
+    });
+
+    const markdown = '$$\\invalid{formula}$$';
+    const { markdown: processed } = processMath(markdown);
+
+    expect(processed).toBe(markdown);
+
+    katexSpy.mockRestore();
+  });
+
+  test('should handle katex rendering errors gracefully for inline math', () => {
+    const katexSpy = jest.spyOn(katex, 'renderToString').mockImplementation(() => {
+      throw new Error('KaTeX error');
+    });
+
+    const markdown = 'Some $invalid$ math';
+    const { markdown: processed } = processMath(markdown);
+
+    expect(processed).toBe(markdown);
+
+    katexSpy.mockRestore();
+  });
+
+  test('should return input unchanged when restoreMath is called with no placeholders', () => {
+    const { restoreMath } = processMath('Plain text without math');
+    const input = '<p>Plain HTML</p>';
+    expect(restoreMath(input)).toBe(input);
+  });
+
+  test('should handle missing indices in restoreMath safely', () => {
+    const { restoreMath } = processMath('Plain text');
+    const htmlWithUnmatchedPlaceholder = '<div>%%MATH_BLOCK_99%% and %%MATH_INLINE_99%%</div>';
+    const result = restoreMath(htmlWithUnmatchedPlaceholder);
+
+    expect(result).toBe('<div> and </div>');
   });
 });
 
