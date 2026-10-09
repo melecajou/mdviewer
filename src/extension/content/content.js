@@ -165,7 +165,8 @@
       return;
     }
 
-    if (!window.DOMPurify || typeof window.DOMPurify.sanitize !== 'function') {
+    const purify = window.DOMPurify || (typeof DOMPurify !== 'undefined' ? DOMPurify : null);
+    if (!purify || typeof purify.sanitize !== 'function') {
       renderedContent.innerHTML = `<p>Erro: Biblioteca de sanitização (DOMPurify) não foi carregada. Renderização cancelada por segurança.</p>`;
       return;
     }
@@ -173,10 +174,6 @@
     const { html, headings } = window.MDViewerEngine.parseMarkdown(text);
 
     // Inject HTML (Sanitized to prevent XSS)
-    const purify = window.DOMPurify || (typeof DOMPurify !== 'undefined' ? DOMPurify : null);
-    if (!purify || typeof purify.sanitize !== 'function') {
-      throw new Error('DOMPurify library is required for rendering markdown content securely.');
-    }
     const sanitizedHtml = purify.sanitize(html, {
       USE_PROFILES: { html: true }
     });
