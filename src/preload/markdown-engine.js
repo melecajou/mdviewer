@@ -418,5 +418,6 @@ function parseMarkdown(rawContent) {
 
 module.exports = {
   parseMarkdown,
-  slugify
+  slugify,
+  splitHighlightedLines
 };
