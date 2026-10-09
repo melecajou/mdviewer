@@ -45,8 +45,8 @@ jest.mock('./file-watcher', () => {
 
 const fs = require('fs');
 const path = require('path');
-const { BrowserWindow, ipcMain, shell } = require('electron');
-const { normalizeCliArg, parseCommandLineArgs, addAllowedPath, allowedPaths, isIgnoredArg, isPathAllowed, isSystemOrRootDirectory, _clearAllowedPaths } = require('./main');
+const { BrowserWindow, ipcMain, shell, nativeImage } = require('electron');
+const { normalizeCliArg, parseCommandLineArgs, addAllowedPath, allowedPaths, isIgnoredArg, isPathAllowed, isSystemOrRootDirectory, loadIconConfig, getIconConfigSync, _clearAllowedPaths, _resetCachedIconConfig } = require('./main');
 
 const ipcMainHandlers = new Map(ipcMain.handle.mock.calls);
 const openExternalHandler = ipcMainHandlers.get('shell:open-external');
@@ -557,6 +557,63 @@ describe('shell:show-in-folder IPC handler', () => {
     const result = await showInFolderHandler({}, null);
     expect(shell.showItemInFolder).not.toHaveBeenCalled();
     expect(result).toBe(true);
+  });
+});
+
+describe('loadIconConfig & getIconConfigSync', () => {
+  let originalPlatform;
+
+  beforeAll(() => {
+    originalPlatform = process.platform;
+  });
+
+  afterAll(() => {
+    Object.defineProperty(process, 'platform', {
+      value: originalPlatform
+    });
+  });
+
+  beforeEach(() => {
+    _resetCachedIconConfig();
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  it('loadIconConfig should asynchronously check icon files with fs.promises.access and cache result', async () => {
+    jest.spyOn(fs.promises, 'access').mockImplementation(async (p) => {
+      if (p.endsWith('icon.png')) return undefined;
+      throw new Error('ENOENT');
+    });
+
+    nativeImage.createFromPath.mockReturnValue('mockIconImg');
+
+    const config = await loadIconConfig();
+    expect(fs.promises.access).toHaveBeenCalled();
+    expect(config.iconImg).toBe('mockIconImg');
+    expect(config.iconPath).toBe('mockIconImg');
+
+    // Second call should return cached result without hitting fs.promises.access
+    fs.promises.access.mockClear();
+    const config2 = await loadIconConfig();
+    expect(config2).toBe(config);
+    expect(fs.promises.access).not.toHaveBeenCalled();
+  });
+
+  it('getIconConfigSync should return cached config if available, or sync fallback if not cached', () => {
+    // When cached
+    const mockCached = { iconImg: 'cachedImg', iconPath: '/cached/path' };
+    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+
+    _resetCachedIconConfig();
+    const uncachedConfig = getIconConfigSync();
+    expect(fs.existsSync).toHaveBeenCalled();
+    expect(uncachedConfig).toBeDefined();
+
+    // Now cached
+    fs.existsSync.mockClear();
+    const cachedConfig = getIconConfigSync();
+    expect(cachedConfig).toBe(uncachedConfig);
+    expect(fs.existsSync).not.toHaveBeenCalled();
   });
 });
 
