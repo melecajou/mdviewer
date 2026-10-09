@@ -846,6 +846,33 @@ ipcMain.handle('shell:show-in-folder', async (event, filePath) => {
   return true;
 });
 
+// Stat cache for fast target/path verification
+const statCache = new Map();
+const STAT_CACHE_TTL = 3000;
+
+async function getCachedStat(filePath) {
+  const now = Date.now();
+  if (statCache.has(filePath)) {
+    const entry = statCache.get(filePath);
+    if (now - entry.time < STAT_CACHE_TTL) {
+      return entry.promise;
+    }
+    statCache.delete(filePath);
+  }
+
+  if (statCache.size > 200) {
+    const oldestKey = statCache.keys().next().value;
+    statCache.delete(oldestKey);
+  }
+
+  const promise = fs.promises.stat(filePath).catch((err) => {
+    statCache.delete(filePath);
+    throw err;
+  });
+  statCache.set(filePath, { promise, time: now });
+  return promise;
+}
+
 // Get Sample Document Path
 ipcMain.handle('app:get-sample-path', () => {
   return path.join(__dirname, '../../sample.md');
@@ -877,7 +904,7 @@ ipcMain.handle('app:allow-dropped-path', async (event, targetPath) => {
       return false;
     }
 
-    const stats = await fs.promises.stat(resolvedPath);
+    const stats = await getCachedStat(resolvedPath);
 
     if (stats.isDirectory()) {
       if (isSystemOrRootDirectory(resolvedPath)) {
@@ -922,6 +949,10 @@ if (process.env.NODE_ENV === 'test') {
     isSystemOrRootDirectory,
     normalizeCliArg,
     parseCommandLineArgs,
-    _clearAllowedPaths: () => allowedPaths.clear()
+    _clearAllowedPaths: () => {
+      allowedPaths.clear();
+      statCache.clear();
+    },
+    _clearStatCache: () => statCache.clear()
   };
 }
