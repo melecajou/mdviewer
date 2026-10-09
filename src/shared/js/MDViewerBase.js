@@ -293,6 +293,39 @@ class MDViewerBase {
     this.findBar.classList.remove('visible');
     this.clearFindHighlights();
   }
+
+  copyToClipboard(text, options = {}) {
+    const {
+      button = null,
+      copiedText = 'Copiado!',
+      originalText = null,
+      copiedClass = null,
+      timeout = 1800
+    } = options;
+
+    return navigator.clipboard.writeText(text).then(() => {
+      if (button) {
+        if (copiedClass) {
+          button.classList.add(copiedClass);
+        }
+        const span = button.querySelector('.copy-text');
+        if (span) {
+          const orig = originalText !== null ? originalText : span.textContent;
+          span.textContent = copiedText;
+          setTimeout(() => {
+            if (copiedClass) {
+              button.classList.remove(copiedClass);
+            }
+            span.textContent = orig;
+          }, timeout);
+        } else if (copiedClass) {
+          setTimeout(() => {
+            button.classList.remove(copiedClass);
+          }, timeout);
+        }
+      }
+    });
+  }
 }
 
 if (typeof module !== 'undefined' && module.exports) {

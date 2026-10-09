@@ -13,6 +13,7 @@ let mainWindow = null;
 const store = new Store();
 let watcherManager = null;
 
+const MARKDOWN_EXTENSIONS = new Set(['.md', '.markdown', '.mdown', '.mkd', '.mdx', '.txt']);
 const allowedPaths = new Set();
 
 function addAllowedPath(p) {
@@ -192,6 +193,7 @@ if (!gotTheLock) {
 
   app.whenReady().then(async () => {
     await store.init();
+    await loadIconConfig();
 
     // Initialize Allowed Paths from store and other known locations
     const allSettings = store.getAll();
@@ -232,13 +234,50 @@ if (!gotTheLock) {
   });
 }
 
-function createWindow() {
-  const savedBounds = store.get('windowBounds') || {};
+let cachedIconConfig = null;
+
+async function loadIconConfig() {
+  if (cachedIconConfig) return cachedIconConfig;
+  const isWin = process.platform === 'win32';
+  const icoPath = path.join(__dirname, '../assets/icon.ico');
+  const pngPath = path.join(__dirname, '../assets/icon.png');
+
+  let pngExists = false;
+  try {
+    await fs.promises.access(pngPath);
+    pngExists = true;
+  } catch {}
+
+  let icoExists = false;
+  if (isWin) {
+    try {
+      await fs.promises.access(icoPath);
+      icoExists = true;
+    } catch {}
+  }
+
+  const iconImg = pngExists ? nativeImage.createFromPath(pngPath) : undefined;
+  const iconPath = (isWin && icoExists) ? icoPath : (iconImg || pngPath);
+
+  cachedIconConfig = { iconImg, iconPath };
+  return cachedIconConfig;
+}
+
+function getIconConfigSync() {
+  if (cachedIconConfig) return cachedIconConfig;
   const isWin = process.platform === 'win32';
   const icoPath = path.join(__dirname, '../assets/icon.ico');
   const pngPath = path.join(__dirname, '../assets/icon.png');
   const iconImg = fs.existsSync(pngPath) ? nativeImage.createFromPath(pngPath) : undefined;
   const iconPath = (isWin && fs.existsSync(icoPath)) ? icoPath : (iconImg || pngPath);
+
+  cachedIconConfig = { iconImg, iconPath };
+  return cachedIconConfig;
+}
+
+function createWindow() {
+  const savedBounds = store.get('windowBounds') || {};
+  const { iconImg, iconPath } = getIconConfigSync();
 
   mainWindow = new BrowserWindow({
     width: savedBounds.width || 1200,
@@ -254,7 +293,7 @@ function createWindow() {
       preload: path.join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: true
     }
   });
 
@@ -698,7 +737,7 @@ ipcMain.handle('file:read-dir', async (event, dirPath) => {
           };
         } else {
           const ext = path.extname(entry.name).toLowerCase();
-          const isMd = ['.md', '.markdown', '.mdown', '.mkd', '.mdx', '.txt'].includes(ext);
+          const isMd = MARKDOWN_EXTENSIONS.has(ext);
           return {
             name: entry.name,
             path: fullPath,
@@ -846,6 +885,33 @@ ipcMain.handle('shell:show-in-folder', async (event, filePath) => {
   return true;
 });
 
+// Stat cache for fast target/path verification
+const statCache = new Map();
+const STAT_CACHE_TTL = 3000;
+
+async function getCachedStat(filePath) {
+  const now = Date.now();
+  if (statCache.has(filePath)) {
+    const entry = statCache.get(filePath);
+    if (now - entry.time < STAT_CACHE_TTL) {
+      return entry.promise;
+    }
+    statCache.delete(filePath);
+  }
+
+  if (statCache.size > 200) {
+    const oldestKey = statCache.keys().next().value;
+    statCache.delete(oldestKey);
+  }
+
+  const promise = fs.promises.stat(filePath).catch((err) => {
+    statCache.delete(filePath);
+    throw err;
+  });
+  statCache.set(filePath, { promise, time: now });
+  return promise;
+}
+
 // Get Sample Document Path
 ipcMain.handle('app:get-sample-path', () => {
   return path.join(__dirname, '../../sample.md');
@@ -877,7 +943,7 @@ ipcMain.handle('app:allow-dropped-path', async (event, targetPath) => {
       return false;
     }
 
-    const stats = await fs.promises.stat(resolvedPath);
+    const stats = await getCachedStat(resolvedPath);
 
     if (stats.isDirectory()) {
       if (isSystemOrRootDirectory(resolvedPath)) {
@@ -887,8 +953,7 @@ ipcMain.handle('app:allow-dropped-path', async (event, targetPath) => {
       return true;
     } else if (stats.isFile()) {
       const ext = path.extname(resolvedPath).toLowerCase();
-      const allowedExtensions = ['.md', '.markdown', '.mdown', '.mkd', '.mdx', '.txt'];
-      if (!allowedExtensions.includes(ext)) {
+      if (!MARKDOWN_EXTENSIONS.has(ext)) {
         return false;
       }
 
@@ -922,6 +987,13 @@ if (process.env.NODE_ENV === 'test') {
     isSystemOrRootDirectory,
     normalizeCliArg,
     parseCommandLineArgs,
-    _clearAllowedPaths: () => allowedPaths.clear()
+    loadIconConfig,
+    getIconConfigSync,
+    _clearAllowedPaths: () => {
+      allowedPaths.clear();
+      statCache.clear();
+    },
+    _clearStatCache: () => statCache.clear(),
+    _resetCachedIconConfig: () => { cachedIconConfig = null; }
   };
 }
