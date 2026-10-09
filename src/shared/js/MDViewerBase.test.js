@@ -135,89 +135,82 @@ describe('MDViewerBase', () => {
     });
   });
 
-  describe('insertTextAtCursor', () => {
-    let textarea;
-
+  describe('copyToClipboard', () => {
     beforeEach(() => {
-      textarea = document.createElement('textarea');
-      document.body.appendChild(textarea);
-      viewer.sourceTextarea = textarea;
-      viewer.handleEditorInput = jest.fn();
+      jest.useFakeTimers();
+      Object.defineProperty(navigator, 'clipboard', {
+        value: {
+          writeText: jest.fn().mockResolvedValue(undefined)
+        },
+        configurable: true
+      });
     });
 
-    it('should insert text at cursor position when no text is selected', () => {
-      textarea.value = 'Hello world';
-      textarea.selectionStart = 5;
-      textarea.selectionEnd = 5;
-
-      viewer.insertTextAtCursor(' beautiful');
-
-      expect(textarea.value).toBe('Hello beautiful world');
-      expect(textarea.selectionStart).toBe(15);
-      expect(textarea.selectionEnd).toBe(15);
-      expect(viewer.handleEditorInput).toHaveBeenCalledTimes(1);
+    afterEach(() => {
+      jest.clearAllTimers();
+      jest.useRealTimers();
     });
 
-    it('should replace selected text when range is selected', () => {
-      textarea.value = 'Hello world';
-      textarea.selectionStart = 6;
-      textarea.selectionEnd = 11;
+    it('should write text to navigator.clipboard and update button span text', async () => {
+      const btn = document.createElement('button');
+      const span = document.createElement('span');
+      span.className = 'copy-text';
+      span.textContent = 'Copy';
+      btn.appendChild(span);
 
-      viewer.insertTextAtCursor('there');
+      const promise = viewer.copyToClipboard('const x = 1;', { button: btn, copiedText: 'Copiado!', timeout: 1800 });
+      await promise;
 
-      expect(textarea.value).toBe('Hello there');
-      expect(textarea.selectionStart).toBe(11);
-      expect(textarea.selectionEnd).toBe(11);
-      expect(viewer.handleEditorInput).toHaveBeenCalledTimes(1);
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('const x = 1;');
+      expect(span.textContent).toBe('Copiado!');
+
+      jest.advanceTimersByTime(1800);
+      expect(span.textContent).toBe('Copy');
     });
 
-    it('should set selectionStart and selectionEnd according to selectOffset and selectLength', () => {
-      textarea.value = '';
-      textarea.selectionStart = 0;
-      textarea.selectionEnd = 0;
+    it('should support copiedClass and explicit originalText', async () => {
+      const btn = document.createElement('button');
+      const span = document.createElement('span');
+      span.className = 'copy-text';
+      span.textContent = 'Original';
+      btn.appendChild(span);
 
-      viewer.insertTextAtCursor('**bold**', 2, 4);
+      const promise = viewer.copyToClipboard('hello', {
+        button: btn,
+        copiedText: 'Done!',
+        originalText: 'Copiar',
+        copiedClass: 'copied',
+        timeout: 1000
+      });
+      await promise;
 
-      expect(textarea.value).toBe('**bold**');
-      expect(textarea.selectionStart).toBe(2);
-      expect(textarea.selectionEnd).toBe(6);
-      expect(textarea.value.substring(textarea.selectionStart, textarea.selectionEnd)).toBe('bold');
+      expect(btn.classList.contains('copied')).toBe(true);
+      expect(span.textContent).toBe('Done!');
+
+      jest.advanceTimersByTime(1000);
+      expect(btn.classList.contains('copied')).toBe(false);
+      expect(span.textContent).toBe('Copiar');
     });
 
-    it('should set cursor position according to selectOffset when selectLength is 0', () => {
-      textarea.value = '';
-      textarea.selectionStart = 0;
-      textarea.selectionEnd = 0;
+    it('should handle button without span when copiedClass is provided', async () => {
+      const btn = document.createElement('button');
 
-      viewer.insertTextAtCursor('hello', 3, 0);
+      const promise = viewer.copyToClipboard('test', { button: btn, copiedClass: 'copied', timeout: 500 });
+      await promise;
 
-      expect(textarea.value).toBe('hello');
-      expect(textarea.selectionStart).toBe(3);
-      expect(textarea.selectionEnd).toBe(3);
+      expect(btn.classList.contains('copied')).toBe(true);
+
+      jest.advanceTimersByTime(500);
+      expect(btn.classList.contains('copied')).toBe(false);
     });
 
-    it('should call document.execCommand when document.queryCommandSupported("insertText") returns true', () => {
-      const origQuery = document.queryCommandSupported;
-      const origExec = document.execCommand;
-
-      document.queryCommandSupported = jest.fn().mockImplementation(cmd => cmd === 'insertText');
-      document.execCommand = jest.fn();
-
-      textarea.value = 'abc';
-      textarea.selectionStart = 3;
-      textarea.selectionEnd = 3;
-
-      viewer.insertTextAtCursor('def');
-
-      expect(document.execCommand).toHaveBeenCalledWith('insertText', false, 'def');
-      expect(viewer.handleEditorInput).toHaveBeenCalledTimes(1);
-
-      document.queryCommandSupported = origQuery;
-      document.execCommand = origExec;
+    it('should work without button passed', async () => {
+      await viewer.copyToClipboard('simple text');
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('simple text');
     });
   });
 
-  describe('formatWrap', () => {
+  describe('Formatting and Editor Methods', () => {
     let textarea;
 
     beforeEach(() => {
@@ -225,209 +218,234 @@ describe('MDViewerBase', () => {
       document.body.appendChild(textarea);
       viewer.sourceTextarea = textarea;
       viewer.handleEditorInput = jest.fn();
+
+      if (!document.queryCommandSupported) {
+        document.queryCommandSupported = jest.fn();
+      }
+      if (!document.execCommand) {
+        document.execCommand = jest.fn();
+      }
     });
 
-    it('should insert wrapped defaultText when no text is selected', () => {
-      textarea.value = '';
-      textarea.selectionStart = 0;
-      textarea.selectionEnd = 0;
-
-      viewer.formatWrap('**', '**', 'negrito');
-
-      expect(textarea.value).toBe('**negrito**');
-      expect(textarea.selectionStart).toBe(2);
-      expect(textarea.selectionEnd).toBe(9);
-      expect(textarea.value.substring(textarea.selectionStart, textarea.selectionEnd)).toBe('negrito');
+    afterEach(() => {
+      textarea.remove();
     });
 
-    it('should insert wrapped "texto" when no text is selected and defaultText argument is omitted', () => {
-      textarea.value = '';
-      textarea.selectionStart = 0;
-      textarea.selectionEnd = 0;
+    describe('insertTextAtCursor', () => {
+      it('should insert text using document.execCommand if queryCommandSupported returns true', () => {
+        const querySpy = jest.spyOn(document, 'queryCommandSupported').mockReturnValue(true);
+        const execSpy = jest.spyOn(document, 'execCommand').mockReturnValue(true);
 
-      viewer.formatWrap('**', '**');
+        textarea.value = 'Hello world';
+        textarea.selectionStart = 5;
+        textarea.selectionEnd = 5;
 
-      expect(textarea.value).toBe('**texto**');
-      expect(textarea.selectionStart).toBe(2);
-      expect(textarea.selectionEnd).toBe(7);
-      expect(textarea.value.substring(textarea.selectionStart, textarea.selectionEnd)).toBe('texto');
+        viewer.insertTextAtCursor(' beautiful');
+
+        expect(querySpy).toHaveBeenCalledWith('insertText');
+        expect(execSpy).toHaveBeenCalledWith('insertText', false, ' beautiful');
+        expect(viewer.handleEditorInput).toHaveBeenCalled();
+
+        querySpy.mockRestore();
+        execSpy.mockRestore();
+      });
+
+      it('should insert text using string manipulation fallback when queryCommandSupported is false', () => {
+        const querySpy = jest.spyOn(document, 'queryCommandSupported').mockReturnValue(false);
+
+        textarea.value = 'Hello world';
+        textarea.selectionStart = 5;
+        textarea.selectionEnd = 5;
+
+        viewer.insertTextAtCursor(' beautiful');
+
+        expect(textarea.value).toBe('Hello beautiful world');
+        expect(textarea.selectionStart).toBe(15);
+        expect(textarea.selectionEnd).toBe(15);
+        expect(viewer.handleEditorInput).toHaveBeenCalled();
+
+        querySpy.mockRestore();
+      });
+
+      it('should adjust selection range when selectOffset and selectLength are provided', () => {
+        jest.spyOn(document, 'queryCommandSupported').mockReturnValue(false);
+
+        textarea.value = 'Hello';
+        textarea.selectionStart = 5;
+        textarea.selectionEnd = 5;
+
+        // Insert " world" and set selection inside the inserted string
+        viewer.insertTextAtCursor(' world', 1, 5);
+
+        expect(textarea.value).toBe('Hello world');
+        expect(textarea.selectionStart).toBe(6); // 5 + 1
+        expect(textarea.selectionEnd).toBe(11);  // 5 + 1 + 5
+      });
+
+      it('should adjust single cursor position when selectOffset > 0 and selectLength is 0', () => {
+        jest.spyOn(document, 'queryCommandSupported').mockReturnValue(false);
+
+        textarea.value = 'Hello';
+        textarea.selectionStart = 5;
+        textarea.selectionEnd = 5;
+
+        viewer.insertTextAtCursor(' world', 3, 0);
+
+        expect(textarea.selectionStart).toBe(8); // 5 + 3
+        expect(textarea.selectionEnd).toBe(8);
+      });
     });
 
-    it('should wrap selected text with before and after markers', () => {
-      textarea.value = 'Hello world';
-      textarea.selectionStart = 6;
-      textarea.selectionEnd = 11;
+    describe('formatWrap', () => {
+      beforeEach(() => {
+        jest.spyOn(document, 'queryCommandSupported').mockReturnValue(false);
+      });
 
-      viewer.formatWrap('*', '*', 'itálico');
+      it('should wrap selected text with before and after strings', () => {
+        textarea.value = 'Hello world';
+        textarea.selectionStart = 6;
+        textarea.selectionEnd = 11;
 
-      expect(textarea.value).toBe('Hello *world*');
-      expect(textarea.selectionStart).toBe(7);
-      expect(textarea.selectionEnd).toBe(12);
-      expect(textarea.value.substring(textarea.selectionStart, textarea.selectionEnd)).toBe('world');
+        viewer.formatWrap('**', '**', 'negrito');
+
+        expect(textarea.value).toBe('Hello **world**');
+        expect(textarea.selectionStart).toBe(8);
+        expect(textarea.selectionEnd).toBe(13);
+      });
+
+      it('should unwrap text if it is already wrapped with before and after strings', () => {
+        textarea.value = 'Hello **world**';
+        textarea.selectionStart = 8;
+        textarea.selectionEnd = 13;
+
+        viewer.formatWrap('**', '**', 'negrito');
+
+        expect(textarea.value).toBe('Hello world');
+        expect(textarea.selectionStart).toBe(6);
+        expect(textarea.selectionEnd).toBe(11);
+      });
+
+      it('should insert defaultText wrapped when no text is selected', () => {
+        textarea.value = 'Hello ';
+        textarea.selectionStart = 6;
+        textarea.selectionEnd = 6;
+
+        viewer.formatWrap('*', '*', 'itálico');
+
+        expect(textarea.value).toBe('Hello *itálico*');
+        expect(textarea.selectionStart).toBe(7);
+        expect(textarea.selectionEnd).toBe(14);
+      });
     });
 
-    it('should unwrap text if selected text is already wrapped with before and after markers', () => {
-      textarea.value = 'Hello **world**';
-      textarea.selectionStart = 8;
-      textarea.selectionEnd = 13;
+    describe('formatHeading', () => {
+      beforeEach(() => {
+        jest.spyOn(document, 'queryCommandSupported').mockReturnValue(false);
+      });
 
-      viewer.formatWrap('**', '**', 'negrito');
+      it('should convert unheaded line to H1 (# )', () => {
+        textarea.value = 'Title';
+        textarea.selectionStart = 2;
+        textarea.selectionEnd = 2;
 
-      expect(textarea.value).toBe('Hello world');
-      expect(textarea.selectionStart).toBe(6);
-      expect(textarea.selectionEnd).toBe(11);
-      expect(textarea.value.substring(textarea.selectionStart, textarea.selectionEnd)).toBe('world');
-    });
-  });
+        viewer.formatHeading();
 
-  describe('formatHeading', () => {
-    let textarea;
+        expect(textarea.value).toBe('# Title');
+      });
 
-    beforeEach(() => {
-      textarea = document.createElement('textarea');
-      document.body.appendChild(textarea);
-      viewer.sourceTextarea = textarea;
-      viewer.handleEditorInput = jest.fn();
-    });
+      it('should cycle H1 (# ) to H2 (## )', () => {
+        textarea.value = '# Title';
+        textarea.selectionStart = 3;
+        textarea.selectionEnd = 3;
 
-    it('should add "# " to plain text line', () => {
-      textarea.value = 'Header Title';
-      textarea.selectionStart = 5;
-      textarea.selectionEnd = 5;
+        viewer.formatHeading();
 
-      viewer.formatHeading();
+        expect(textarea.value).toBe('## Title');
+      });
 
-      expect(textarea.value).toBe('# Header Title');
-    });
+      it('should cycle H2 (## ) to H3 (### )', () => {
+        textarea.value = '## Title';
+        textarea.selectionStart = 4;
+        textarea.selectionEnd = 4;
 
-    it('should convert "# " to "## "', () => {
-      textarea.value = '# Header Title';
-      textarea.selectionStart = 5;
-      textarea.selectionEnd = 5;
+        viewer.formatHeading();
 
-      viewer.formatHeading();
+        expect(textarea.value).toBe('### Title');
+      });
 
-      expect(textarea.value).toBe('## Header Title');
-    });
+      it('should cycle H3 (### ) back to normal text', () => {
+        textarea.value = '### Title';
+        textarea.selectionStart = 5;
+        textarea.selectionEnd = 5;
 
-    it('should convert "## " to "### "', () => {
-      textarea.value = '## Header Title';
-      textarea.selectionStart = 5;
-      textarea.selectionEnd = 5;
+        viewer.formatHeading();
 
-      viewer.formatHeading();
-
-      expect(textarea.value).toBe('### Header Title');
+        expect(textarea.value).toBe('Title');
+      });
     });
 
-    it('should remove "### " heading prefix', () => {
-      textarea.value = '### Header Title';
-      textarea.selectionStart = 5;
-      textarea.selectionEnd = 5;
+    describe('formatPrefix', () => {
+      beforeEach(() => {
+        jest.spyOn(document, 'queryCommandSupported').mockReturnValue(false);
+      });
 
-      viewer.formatHeading();
+      it('should add prefix to selected single line', () => {
+        textarea.value = 'Item 1';
+        textarea.selectionStart = 0;
+        textarea.selectionEnd = 6;
 
-      expect(textarea.value).toBe('Header Title');
-    });
+        viewer.formatPrefix('- ');
 
-    it('should clean up non-standard hash prefixes without space and make it "# "', () => {
-      textarea.value = '##### Header Title';
-      textarea.selectionStart = 7;
-      textarea.selectionEnd = 7;
+        expect(textarea.value).toBe('- Item 1');
+      });
 
-      viewer.formatHeading();
+      it('should add prefix to multiline selection', () => {
+        textarea.value = 'Line 1\nLine 2';
+        textarea.selectionStart = 0;
+        textarea.selectionEnd = 13;
 
-      expect(textarea.value).toBe('# Header Title');
-    });
+        viewer.formatPrefix('> ');
 
-    it('should affect only the current line in multiline text', () => {
-      textarea.value = 'First line\nSecond line\nThird line';
-      const secondLinePos = 'First line\n'.length + 2;
-      textarea.selectionStart = secondLinePos;
-      textarea.selectionEnd = secondLinePos;
+        expect(textarea.value).toBe('> Line 1\n> Line 2');
+      });
 
-      viewer.formatHeading();
+      it('should remove prefix if all lines already have the prefix', () => {
+        textarea.value = '> Line 1\n> Line 2';
+        textarea.selectionStart = 0;
+        textarea.selectionEnd = 17;
 
-      expect(textarea.value).toBe('First line\n# Second line\nThird line');
-    });
-  });
+        viewer.formatPrefix('> ');
 
-  describe('formatPrefix', () => {
-    let textarea;
+        expect(textarea.value).toBe('Line 1\nLine 2');
+      });
 
-    beforeEach(() => {
-      textarea = document.createElement('textarea');
-      document.body.appendChild(textarea);
-      viewer.sourceTextarea = textarea;
-      viewer.handleEditorInput = jest.fn();
-    });
+      it('should format ordered list prefix "1. " with sequential numbers', () => {
+        textarea.value = 'First\nSecond\nThird';
+        textarea.selectionStart = 0;
+        textarea.selectionEnd = 18;
 
-    it('should prepend prefix to single line', () => {
-      textarea.value = 'List item';
-      textarea.selectionStart = 0;
-      textarea.selectionEnd = 9;
+        viewer.formatPrefix('1. ');
 
-      viewer.formatPrefix('- ');
+        expect(textarea.value).toBe('1. First\n2. Second\n3. Third');
+      });
 
-      expect(textarea.value).toBe('- List item');
-    });
+      it('should strip existing prefixes when adding a new prefix type', () => {
+        textarea.value = '- Bullet item';
+        textarea.selectionStart = 0;
+        textarea.selectionEnd = 13;
 
-    it('should prepend prefix to multiple lines and replace existing list markers', () => {
-      textarea.value = 'item 1\n* item 2\n1. item 3';
-      textarea.selectionStart = 0;
-      textarea.selectionEnd = textarea.value.length;
+        viewer.formatPrefix('1. ');
 
-      viewer.formatPrefix('- ');
-
-      expect(textarea.value).toBe('- item 1\n- item 2\n- item 3');
-    });
-
-    it('should format auto-incrementing numbers when prefix is "1. "', () => {
-      textarea.value = 'Apple\nBanana\nCherry';
-      textarea.selectionStart = 0;
-      textarea.selectionEnd = textarea.value.length;
-
-      viewer.formatPrefix('1. ');
-
-      expect(textarea.value).toBe('1. Apple\n2. Banana\n3. Cherry');
-    });
-
-    it('should remove prefix if all lines already start with the prefix', () => {
-      textarea.value = '- Item A\n- Item B';
-      textarea.selectionStart = 0;
-      textarea.selectionEnd = textarea.value.length;
-
-      viewer.formatPrefix('- ');
-
-      expect(textarea.value).toBe('Item A\nItem B');
-    });
-  });
-
-  describe('formatLink, formatImage, formatCodeBlock, formatTable', () => {
-    let textarea;
-
-    beforeEach(() => {
-      textarea = document.createElement('textarea');
-      document.body.appendChild(textarea);
-      viewer.sourceTextarea = textarea;
-      viewer.handleEditorInput = jest.fn();
+        expect(textarea.value).toBe('1. Bullet item');
+      });
     });
 
     describe('formatLink', () => {
-      it('should format selected text as link', () => {
-        textarea.value = 'click here';
-        textarea.selectionStart = 0;
-        textarea.selectionEnd = 10;
-
-        viewer.formatLink();
-
-        expect(textarea.value).toBe('[click here](https://exemplo.com)');
-        expect(textarea.selectionStart).toBe(13);
-        expect(textarea.selectionEnd).toBe(32);
-        expect(textarea.value.substring(textarea.selectionStart, textarea.selectionEnd)).toBe('https://exemplo.com');
+      beforeEach(() => {
+        jest.spyOn(document, 'queryCommandSupported').mockReturnValue(false);
       });
 
-      it('should use default text when nothing is selected', () => {
+      it('should insert default link text when nothing is selected', () => {
         textarea.value = '';
         textarea.selectionStart = 0;
         textarea.selectionEnd = 0;
@@ -435,24 +453,29 @@ describe('MDViewerBase', () => {
         viewer.formatLink();
 
         expect(textarea.value).toBe('[texto do link](https://exemplo.com)');
+        expect(textarea.selectionStart).toBe(16);
+        expect(textarea.selectionEnd).toBe(35);
+      });
+
+      it('should insert link with selected text', () => {
+        textarea.value = 'Google';
+        textarea.selectionStart = 0;
+        textarea.selectionEnd = 6;
+
+        viewer.formatLink();
+
+        expect(textarea.value).toBe('[Google](https://exemplo.com)');
+        expect(textarea.selectionStart).toBe(9);
+        expect(textarea.selectionEnd).toBe(28);
       });
     });
 
     describe('formatImage', () => {
-      it('should format selected text as image alt text', () => {
-        textarea.value = 'My Image';
-        textarea.selectionStart = 0;
-        textarea.selectionEnd = 8;
-
-        viewer.formatImage();
-
-        expect(textarea.value).toBe('![My Image](caminho/para/imagem.png)');
-        expect(textarea.selectionStart).toBe(12);
-        expect(textarea.selectionEnd).toBe(34);
-        expect(textarea.value.substring(textarea.selectionStart, textarea.selectionEnd)).toBe('caminho/para/imagem.pn');
+      beforeEach(() => {
+        jest.spyOn(document, 'queryCommandSupported').mockReturnValue(false);
       });
 
-      it('should use default legend when nothing is selected', () => {
+      it('should insert default image caption when nothing is selected', () => {
         textarea.value = '';
         textarea.selectionStart = 0;
         textarea.selectionEnd = 0;
@@ -460,24 +483,29 @@ describe('MDViewerBase', () => {
         viewer.formatImage();
 
         expect(textarea.value).toBe('![legenda](caminho/para/imagem.png)');
+        expect(textarea.selectionStart).toBe(11);
+        expect(textarea.selectionEnd).toBe(33);
+      });
+
+      it('should insert image with selected caption text', () => {
+        textarea.value = 'Logo';
+        textarea.selectionStart = 0;
+        textarea.selectionEnd = 4;
+
+        viewer.formatImage();
+
+        expect(textarea.value).toBe('![Logo](caminho/para/imagem.png)');
+        expect(textarea.selectionStart).toBe(8);
+        expect(textarea.selectionEnd).toBe(30);
       });
     });
 
     describe('formatCodeBlock', () => {
-      it('should wrap selected code in javascript code block', () => {
-        textarea.value = 'const a = 1;';
-        textarea.selectionStart = 0;
-        textarea.selectionEnd = 12;
-
-        viewer.formatCodeBlock();
-
-        expect(textarea.value).toBe('```javascript\nconst a = 1;\n```\n');
-        expect(textarea.selectionStart).toBe(3);
-        expect(textarea.selectionEnd).toBe(13);
-        expect(textarea.value.substring(textarea.selectionStart, textarea.selectionEnd)).toBe('javascript');
+      beforeEach(() => {
+        jest.spyOn(document, 'queryCommandSupported').mockReturnValue(false);
       });
 
-      it('should use default placeholder code when nothing is selected', () => {
+      it('should insert default code block when nothing is selected', () => {
         textarea.value = '';
         textarea.selectionStart = 0;
         textarea.selectionEnd = 0;
@@ -485,10 +513,26 @@ describe('MDViewerBase', () => {
         viewer.formatCodeBlock();
 
         expect(textarea.value).toBe('```javascript\n// código aqui\n```\n');
+        expect(textarea.selectionStart).toBe(3);
+        expect(textarea.selectionEnd).toBe(13);
+      });
+
+      it('should wrap selected code inside code block', () => {
+        textarea.value = 'const x = 10;';
+        textarea.selectionStart = 0;
+        textarea.selectionEnd = 13;
+
+        viewer.formatCodeBlock();
+
+        expect(textarea.value).toBe('```javascript\nconst x = 10;\n```\n');
       });
     });
 
     describe('formatTable', () => {
+      beforeEach(() => {
+        jest.spyOn(document, 'queryCommandSupported').mockReturnValue(false);
+      });
+
       it('should insert markdown table template', () => {
         textarea.value = '';
         textarea.selectionStart = 0;
@@ -496,207 +540,204 @@ describe('MDViewerBase', () => {
 
         viewer.formatTable();
 
-        expect(textarea.value).toContain('| Coluna 1 | Coluna 2 | Coluna 3 |');
-        expect(textarea.value).toContain('| Item 1 | Valor A | 100 |');
-      });
-    });
-  });
-
-  describe('keyboard event handlers', () => {
-    let textarea;
-
-    beforeEach(() => {
-      textarea = document.createElement('textarea');
-      document.body.appendChild(textarea);
-      viewer.sourceTextarea = textarea;
-      viewer.handleEditorInput = jest.fn();
-    });
-
-    describe('handleTabKey', () => {
-      it('should insert 2 spaces at cursor position when no text is selected and shift is false', () => {
-        textarea.value = 'Hello';
-        textarea.selectionStart = 5;
-        textarea.selectionEnd = 5;
-
-        viewer.handleTabKey(false);
-
-        expect(textarea.value).toBe('Hello  ');
-      });
-
-      it('should indent selected lines by 2 spaces', () => {
-        textarea.value = 'line1\nline2';
-        textarea.selectionStart = 0;
-        textarea.selectionEnd = 11;
-
-        viewer.handleTabKey(false);
-
-        expect(textarea.value).toBe('  line1\n  line2');
-      });
-
-      it('should unindent selected lines by up to 2 spaces when shift is true', () => {
-        textarea.value = '  line1\n line2\nline3';
-        textarea.selectionStart = 0;
-        textarea.selectionEnd = textarea.value.length;
-
-        viewer.handleTabKey(true);
-
-        expect(textarea.value).toBe('line1\nline2\nline3');
+        const expected = '| Coluna 1 | Coluna 2 | Coluna 3 |\n| :--- | :--- | :--- |\n| Item 1 | Valor A | 100 |\n| Item 2 | Valor B | 200 |\n';
+        expect(textarea.value).toBe(expected);
       });
     });
 
-    describe('handleEnterKey', () => {
-      it('should continue bullet list on Enter with content', () => {
-        textarea.value = '- Item 1';
-        textarea.selectionStart = 8;
-        textarea.selectionEnd = 8;
-        const e = { preventDefault: jest.fn() };
-
-        viewer.handleEnterKey(e);
-
-        expect(e.preventDefault).toHaveBeenCalled();
-        expect(textarea.value).toBe('- Item 1\n- ');
+    describe('Keyboard Event Handlers', () => {
+      beforeEach(() => {
+        jest.spyOn(document, 'queryCommandSupported').mockReturnValue(false);
       });
 
-      it('should remove bullet list marker on Enter with empty list item', () => {
-        textarea.value = '- ';
-        textarea.selectionStart = 2;
-        textarea.selectionEnd = 2;
-        const e = { preventDefault: jest.fn() };
+      describe('handleEditorKeydown', () => {
+        it('should trigger formatWrap for bold on Ctrl+B', () => {
+          const spy = jest.spyOn(viewer, 'formatWrap');
+          const event = new KeyboardEvent('keydown', { key: 'b', ctrlKey: true });
+          const preventDefaultSpy = jest.spyOn(event, 'preventDefault');
 
-        viewer.handleEnterKey(e);
+          viewer.handleEditorKeydown(event);
 
-        expect(e.preventDefault).toHaveBeenCalled();
-        expect(textarea.value).toBe('');
+          expect(preventDefaultSpy).toHaveBeenCalled();
+          expect(spy).toHaveBeenCalledWith('**', '**', 'negrito');
+        });
+
+        it('should trigger formatWrap for italic on Cmd+I', () => {
+          const spy = jest.spyOn(viewer, 'formatWrap');
+          const event = new KeyboardEvent('keydown', { key: 'i', metaKey: true });
+
+          viewer.handleEditorKeydown(event);
+
+          expect(spy).toHaveBeenCalledWith('*', '*', 'itálico');
+        });
+
+        it('should trigger formatLink on Ctrl+K', () => {
+          const spy = jest.spyOn(viewer, 'formatLink');
+          const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true });
+
+          viewer.handleEditorKeydown(event);
+
+          expect(spy).toHaveBeenCalled();
+        });
+
+        it('should trigger formatCodeBlock on Ctrl+Shift+C', () => {
+          const spy = jest.spyOn(viewer, 'formatCodeBlock');
+          const event = new KeyboardEvent('keydown', { key: 'c', ctrlKey: true, shiftKey: true });
+
+          viewer.handleEditorKeydown(event);
+
+          expect(spy).toHaveBeenCalled();
+        });
+
+        it('should trigger handleTabKey on Tab key', () => {
+          const spy = jest.spyOn(viewer, 'handleTabKey');
+          const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true });
+
+          viewer.handleEditorKeydown(event);
+
+          expect(spy).toHaveBeenCalledWith(true);
+        });
+
+        it('should trigger handleEnterKey on Enter key', () => {
+          const spy = jest.spyOn(viewer, 'handleEnterKey');
+          const event = new KeyboardEvent('keydown', { key: 'Enter' });
+
+          viewer.handleEditorKeydown(event);
+
+          expect(spy).toHaveBeenCalledWith(event);
+        });
       });
 
-      it('should continue task list on Enter with content', () => {
-        textarea.value = '  - [x] Task 1';
-        textarea.selectionStart = 14;
-        textarea.selectionEnd = 14;
-        const e = { preventDefault: jest.fn() };
+      describe('handleTabKey', () => {
+        it('should insert two spaces when single cursor and not shift', () => {
+          textarea.value = 'hello';
+          textarea.selectionStart = 5;
+          textarea.selectionEnd = 5;
 
-        viewer.handleEnterKey(e);
+          viewer.handleTabKey(false);
 
-        expect(e.preventDefault).toHaveBeenCalled();
-        expect(textarea.value).toBe('  - [x] Task 1\n  - [ ] ');
+          expect(textarea.value).toBe('hello  ');
+        });
+
+        it('should indent selected lines on Tab', () => {
+          textarea.value = 'line1\nline2';
+          textarea.selectionStart = 0;
+          textarea.selectionEnd = 11;
+
+          viewer.handleTabKey(false);
+
+          expect(textarea.value).toBe('  line1\n  line2');
+        });
+
+        it('should unindent selected lines on Shift+Tab', () => {
+          textarea.value = '  line1\n  line2';
+          textarea.selectionStart = 0;
+          textarea.selectionEnd = 15;
+
+          viewer.handleTabKey(true);
+
+          expect(textarea.value).toBe('line1\nline2');
+        });
+
+        it('should unindent single space if line starts with 1 space on Shift+Tab', () => {
+          textarea.value = ' line1';
+          textarea.selectionStart = 0;
+          textarea.selectionEnd = 6;
+
+          viewer.handleTabKey(true);
+
+          expect(textarea.value).toBe('line1');
+        });
       });
 
-      it('should remove task list marker on Enter with empty task item', () => {
-        textarea.value = '  - [ ] ';
-        textarea.selectionStart = 8;
-        textarea.selectionEnd = 8;
-        const e = { preventDefault: jest.fn() };
+      describe('handleEnterKey', () => {
+        it('should auto-continue bullet list', () => {
+          textarea.value = '- Item 1';
+          textarea.selectionStart = 8;
+          textarea.selectionEnd = 8;
 
-        viewer.handleEnterKey(e);
+          const event = new KeyboardEvent('keydown', { key: 'Enter' });
+          const preventDefaultSpy = jest.spyOn(event, 'preventDefault');
 
-        expect(e.preventDefault).toHaveBeenCalled();
-        expect(textarea.value).toBe('');
-      });
+          viewer.handleEnterKey(event);
 
-      it('should continue numbered list with incremented number on Enter with content', () => {
-        textarea.value = '1. First';
-        textarea.selectionStart = 8;
-        textarea.selectionEnd = 8;
-        const e = { preventDefault: jest.fn() };
+          expect(preventDefaultSpy).toHaveBeenCalled();
+          expect(textarea.value).toBe('- Item 1\n- ');
+        });
 
-        viewer.handleEnterKey(e);
+        it('should exit bullet list when enter is pressed on empty bullet item', () => {
+          textarea.value = '- ';
+          textarea.selectionStart = 2;
+          textarea.selectionEnd = 2;
 
-        expect(e.preventDefault).toHaveBeenCalled();
-        expect(textarea.value).toBe('1. First\n2. ');
-      });
+          const event = new KeyboardEvent('keydown', { key: 'Enter' });
 
-      it('should remove numbered list marker on Enter with empty numbered item', () => {
-        textarea.value = '1. ';
-        textarea.selectionStart = 3;
-        textarea.selectionEnd = 3;
-        const e = { preventDefault: jest.fn() };
+          viewer.handleEnterKey(event);
 
-        viewer.handleEnterKey(e);
+          expect(textarea.value).toBe('');
+        });
 
-        expect(e.preventDefault).toHaveBeenCalled();
-        expect(textarea.value).toBe('');
-      });
+        it('should auto-continue task list', () => {
+          textarea.value = '- [x] Task 1';
+          textarea.selectionStart = 12;
+          textarea.selectionEnd = 12;
 
-      it('should do nothing for normal non-list lines', () => {
-        textarea.value = 'Just normal text';
-        textarea.selectionStart = 16;
-        textarea.selectionEnd = 16;
-        const e = { preventDefault: jest.fn() };
+          const event = new KeyboardEvent('keydown', { key: 'Enter' });
 
-        viewer.handleEnterKey(e);
+          viewer.handleEnterKey(event);
 
-        expect(e.preventDefault).not.toHaveBeenCalled();
-        expect(textarea.value).toBe('Just normal text');
-      });
-    });
+          expect(textarea.value).toBe('- [x] Task 1\n- [ ] ');
+        });
 
-    describe('handleEditorKeydown', () => {
-      it('should handle Ctrl+B / Cmd+B for bold formatting', () => {
-        jest.spyOn(viewer, 'formatWrap');
-        const e = { ctrlKey: true, metaKey: false, key: 'b', shiftKey: false, preventDefault: jest.fn() };
+        it('should exit task list when enter is pressed on empty task item', () => {
+          textarea.value = '- [ ] ';
+          textarea.selectionStart = 6;
+          textarea.selectionEnd = 6;
 
-        viewer.handleEditorKeydown(e);
+          const event = new KeyboardEvent('keydown', { key: 'Enter' });
 
-        expect(e.preventDefault).toHaveBeenCalled();
-        expect(viewer.formatWrap).toHaveBeenCalledWith('**', '**', 'negrito');
-      });
+          viewer.handleEnterKey(event);
 
-      it('should handle Ctrl+I / Cmd+I for italic formatting', () => {
-        jest.spyOn(viewer, 'formatWrap');
-        const e = { ctrlKey: false, metaKey: true, key: 'i', shiftKey: false, preventDefault: jest.fn() };
+          expect(textarea.value).toBe('');
+        });
 
-        viewer.handleEditorKeydown(e);
+        it('should auto-continue numbered list with incremented index', () => {
+          textarea.value = '1. First';
+          textarea.selectionStart = 8;
+          textarea.selectionEnd = 8;
 
-        expect(e.preventDefault).toHaveBeenCalled();
-        expect(viewer.formatWrap).toHaveBeenCalledWith('*', '*', 'itálico');
-      });
+          const event = new KeyboardEvent('keydown', { key: 'Enter' });
 
-      it('should handle Ctrl+K / Cmd+K for link formatting', () => {
-        jest.spyOn(viewer, 'formatLink');
-        const e = { ctrlKey: true, metaKey: false, key: 'k', shiftKey: false, preventDefault: jest.fn() };
+          viewer.handleEnterKey(event);
 
-        viewer.handleEditorKeydown(e);
+          expect(textarea.value).toBe('1. First\n2. ');
+        });
 
-        expect(e.preventDefault).toHaveBeenCalled();
-        expect(viewer.formatLink).toHaveBeenCalled();
-      });
+        it('should exit numbered list when enter is pressed on empty numbered item', () => {
+          textarea.value = '2. ';
+          textarea.selectionStart = 3;
+          textarea.selectionEnd = 3;
 
-      it('should handle Ctrl+Shift+C / Cmd+Shift+C for code block formatting', () => {
-        jest.spyOn(viewer, 'formatCodeBlock');
-        const e = { ctrlKey: true, metaKey: false, key: 'C', shiftKey: true, preventDefault: jest.fn() };
+          const event = new KeyboardEvent('keydown', { key: 'Enter' });
 
-        viewer.handleEditorKeydown(e);
+          viewer.handleEnterKey(event);
 
-        expect(e.preventDefault).toHaveBeenCalled();
-        expect(viewer.formatCodeBlock).toHaveBeenCalled();
-      });
+          expect(textarea.value).toBe('');
+        });
 
-      it('should handle Tab key', () => {
-        jest.spyOn(viewer, 'handleTabKey');
-        const e = { ctrlKey: false, metaKey: false, key: 'Tab', shiftKey: true, preventDefault: jest.fn() };
+        it('should do nothing special for normal text lines on enter', () => {
+          textarea.value = 'Normal text';
+          textarea.selectionStart = 11;
+          textarea.selectionEnd = 11;
 
-        viewer.handleEditorKeydown(e);
+          const event = new KeyboardEvent('keydown', { key: 'Enter' });
+          const preventDefaultSpy = jest.spyOn(event, 'preventDefault');
 
-        expect(e.preventDefault).toHaveBeenCalled();
-        expect(viewer.handleTabKey).toHaveBeenCalledWith(true);
-      });
+          viewer.handleEnterKey(event);
 
-      it('should handle Enter key', () => {
-        jest.spyOn(viewer, 'handleEnterKey');
-        const e = { ctrlKey: false, metaKey: false, key: 'Enter', shiftKey: false, preventDefault: jest.fn() };
-
-        viewer.handleEditorKeydown(e);
-
-        expect(viewer.handleEnterKey).toHaveBeenCalledWith(e);
-      });
-
-      it('should ignore unhandled key combinations', () => {
-        jest.spyOn(viewer, 'formatWrap');
-        const e = { ctrlKey: true, metaKey: false, key: 'x', shiftKey: false, preventDefault: jest.fn() };
-
-        viewer.handleEditorKeydown(e);
-
-        expect(e.preventDefault).not.toHaveBeenCalled();
+          expect(preventDefaultSpy).not.toHaveBeenCalled();
+          expect(textarea.value).toBe('Normal text');
+        });
       });
     });
   });

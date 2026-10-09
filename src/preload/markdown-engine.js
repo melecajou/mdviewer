@@ -98,14 +98,20 @@ function splitHighlightedLines(html) {
   const lines = html.split('\n');
   const result = [];
   const openTags = [];
+  let prefix = '';
+  let suffix = '';
+
+  const tagRegex = /<(\/)?span(?: class="([^"]*)")?>/g;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const prefix = openTags.map(cls => `<span class="${cls}">`).join('');
+    const linePrefix = prefix;
+    let dirty = false;
 
-    const tagRegex = /<(\/)?span(?: class="([^"]*)")?>/g;
+    tagRegex.lastIndex = 0;
     let match;
     while ((match = tagRegex.exec(line)) !== null) {
+      dirty = true;
       if (match[1] === '/') {
         openTags.pop();
       } else {
@@ -113,8 +119,12 @@ function splitHighlightedLines(html) {
       }
     }
 
-    const suffix = openTags.map(() => '</span>').join('');
-    result.push(prefix + line + suffix);
+    if (dirty) {
+      prefix = openTags.length > 0 ? openTags.map(cls => `<span class="${cls}">`).join('') : '';
+      suffix = openTags.length > 0 ? '</span>'.repeat(openTags.length) : '';
+    }
+
+    result.push(linePrefix + line + suffix);
   }
   return result;
 }
@@ -406,7 +416,14 @@ function parseMarkdown(rawContent) {
   };
 }
 
-module.exports = {
+const exportsObj = {
   parseMarkdown,
-  slugify
+  slugify,
+  splitHighlightedLines
 };
+
+if (process.env.NODE_ENV === 'test') {
+  exportsObj.processMath = processMath;
+}
+
+module.exports = exportsObj;
