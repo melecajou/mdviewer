@@ -1,6 +1,6 @@
 const hljs = require('highlight.js');
 const katex = require('katex');
-const { slugify, parseMarkdown, processMath } = require('./markdown-engine');
+const { slugify, parseMarkdown, splitHighlightedLines, processMath } = require('./markdown-engine');
 
 describe('slugify', () => {
   test('should lowercase text', () => {
@@ -315,5 +315,67 @@ describe('processMath', () => {
     const result = restoreMath(htmlWithUnmatchedPlaceholder);
 
     expect(result).toBe('<div> and </div>');
+  });
+});
+
+describe('splitHighlightedLines', () => {
+  test('should return [""] for empty or falsy input', () => {
+    expect(splitHighlightedLines('')).toEqual(['']);
+    expect(splitHighlightedLines(null)).toEqual(['']);
+    expect(splitHighlightedLines(undefined)).toEqual(['']);
+  });
+
+  test('should handle single-line HTML without span tags', () => {
+    expect(splitHighlightedLines('const x = 1;')).toEqual(['const x = 1;']);
+  });
+
+  test('should handle multi-line HTML without span tags', () => {
+    const input = 'line 1\nline 2\nline 3';
+    expect(splitHighlightedLines(input)).toEqual(['line 1', 'line 2', 'line 3']);
+  });
+
+  test('should handle single span tag within a single line', () => {
+    const input = '<span class="hljs-keyword">const</span> x = 1;';
+    expect(splitHighlightedLines(input)).toEqual(['<span class="hljs-keyword">const</span> x = 1;']);
+  });
+
+  test('should balance and carry over open span tags across multi-line breaks', () => {
+    const input = '<span class="hljs-string">first line\nsecond line</span>';
+    const expected = [
+      '<span class="hljs-string">first line</span>',
+      '<span class="hljs-string">second line</span>'
+    ];
+    expect(splitHighlightedLines(input)).toEqual(expected);
+  });
+
+  test('should handle nested span tags crossing multi-line boundaries', () => {
+    const input = '<span class="hljs-function">function <span class="hljs-title">foo</span>(\n  arg1,\n  arg2\n)</span>';
+    const expected = [
+      '<span class="hljs-function">function <span class="hljs-title">foo</span>(</span>',
+      '<span class="hljs-function">  arg1,</span>',
+      '<span class="hljs-function">  arg2</span>',
+      '<span class="hljs-function">)</span>'
+    ];
+    expect(splitHighlightedLines(input)).toEqual(expected);
+  });
+
+  test('should handle spans without class attribute or with empty class attribute', () => {
+    const input = '<span>line 1\nline 2</span>';
+    const expected = [
+      '<span>line 1</span>',
+      '<span class="">line 2</span>'
+    ];
+    expect(splitHighlightedLines(input)).toEqual(expected);
+  });
+
+  test('should handle multi-line HTML where tags open and close across lines', () => {
+    const input = '<span class="hljs-comment">/* line 1\n * line 2\n */</span>\nconst x = 1;';
+    const expected = [
+      '<span class="hljs-comment">/* line 1</span>',
+      '<span class="hljs-comment"> * line 2</span>',
+      '<span class="hljs-comment"> */</span>',
+      'const x = 1;'
+    ];
+    expect(splitHighlightedLines(input)).toEqual(expected);
   });
 });

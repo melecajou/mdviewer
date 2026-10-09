@@ -1248,18 +1248,36 @@ class MDViewerExtensionApp extends MDViewerBase {
       parsed = window.MDViewerEngine.parseMarkdown(content);
     } catch (err) {
       console.error('Erro ao renderizar markdown:', err);
-      this.markdownContainer.innerHTML = `<div style="padding: 24px; color: var(--color-error, #f85149);">
-        <h3>Erro ao processar markdown</h3>
-        <p>${err.message}</p>
-        <pre style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 6px; overflow-x: auto;">${err.stack || ''}</pre>
-      </div>`;
+      const errorDiv = document.createElement('div');
+      errorDiv.style.padding = '24px';
+      errorDiv.style.color = 'var(--color-error, #f85149)';
+
+      const h3 = document.createElement('h3');
+      h3.textContent = 'Erro ao processar markdown';
+
+      const p = document.createElement('p');
+      p.textContent = err ? err.message || '' : '';
+
+      const pre = document.createElement('pre');
+      pre.style.background = 'rgba(0,0,0,0.2)';
+      pre.style.padding = '12px';
+      pre.style.borderRadius = '6px';
+      pre.style.overflowX = 'auto';
+      pre.textContent = err ? err.stack || '' : '';
+
+      errorDiv.appendChild(h3);
+      errorDiv.appendChild(p);
+      errorDiv.appendChild(pre);
+
+      this.markdownContainer.innerHTML = '';
+      this.markdownContainer.appendChild(errorDiv);
       return;
     }
 
     const { html, headings, stats } = parsed;
 
     // Inject HTML (Sanitized to prevent XSS)
-    const purify = window.DOMPurify || (typeof DOMPurify !== 'undefined' ? DOMPurify : null);
+    const purify = typeof DOMPurify !== 'undefined' ? DOMPurify : null;
     if (!purify || typeof purify.sanitize !== 'function') {
       throw new Error('DOMPurify library is required for rendering markdown content securely.');
     }
