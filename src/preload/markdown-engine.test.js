@@ -1,6 +1,6 @@
 const hljs = require('highlight.js');
 const katex = require('katex');
-const { slugify, parseMarkdown, splitHighlightedLines, processMath } = require('./markdown-engine');
+const { slugify, parseMarkdown, splitHighlightedLines, processMath, renderCache } = require('./markdown-engine');
 
 describe('slugify', () => {
   test('should lowercase text', () => {
@@ -42,6 +42,12 @@ describe('slugify', () => {
 });
 
 describe('parseMarkdown', () => {
+  beforeEach(() => {
+    if (renderCache) {
+      renderCache.clear();
+    }
+  });
+
   test('should parse basic paragraph', () => {
     const result = parseMarkdown('Hello world');
     expect(result.html.trim()).toBe('<p>Hello world</p>');
@@ -184,6 +190,57 @@ describe('parseMarkdown', () => {
     expect(result.stats.chars).toBe(markdown.length);
     expect(result.stats.lines).toBe(markdown.split('\n').length);
     expect(result.stats.readTimeMinutes).toBe(1);
+  });
+
+  describe('caching and input edge cases', () => {
+    test('should return default empty structure when rawContent is falsy or not a string', () => {
+      const defaultStats = { words: 0, chars: 0, lines: 0, readTimeMinutes: 0 };
+      const expected = { html: '', headings: [], stats: defaultStats };
+
+      expect(parseMarkdown(null)).toEqual(expected);
+      expect(parseMarkdown(undefined)).toEqual(expected);
+      expect(parseMarkdown(12345)).toEqual(expected);
+      expect(parseMarkdown({})).toEqual(expected);
+      expect(parseMarkdown(true)).toEqual(expected);
+      expect(parseMarkdown(['content'])).toEqual(expected);
+    });
+
+    test('should cache and return cached parse result on identical input', () => {
+      const largeMarkdown = `# Documentation Title\n\n` +
+        `This is a long markdown document used to test render caching.\n\n` +
+        `## Section 1: Code\n\n` +
+        `\`\`\`js\nfunction calculateSum(a, b) {\n  return a + b;\n}\n\`\`\`\n\n` +
+        `## Section 2: Math\n\n` +
+        `Formula: $E = mc^2$\n\n` +
+        `$$ \\int_{0}^{\\infty} e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2} $$\n\n` +
+        `> [!NOTE]\n> Ensure caching works for identical inputs.\n`;
+
+      expect(renderCache.size).toBe(0);
+
+      // First call (cache miss)
+      const firstResult = parseMarkdown(largeMarkdown);
+      expect(renderCache.size).toBe(1);
+
+      // Second call with same input (cache hit)
+      const secondResult = parseMarkdown(largeMarkdown);
+      expect(renderCache.size).toBe(1);
+      expect(secondResult).toBe(firstResult); // Should return identical cached object reference
+    });
+
+    test('should re-parse and add new entry to cache when content changes', () => {
+      const docA = '# Document A\n\nContent for document A.';
+      const docB = '# Document B\n\nContent for document B.';
+
+      expect(renderCache.size).toBe(0);
+
+      const resultA = parseMarkdown(docA);
+      expect(renderCache.size).toBe(1);
+
+      const resultB = parseMarkdown(docB);
+      expect(renderCache.size).toBe(2);
+      expect(resultB).not.toBe(resultA);
+      expect(resultB.html).toContain('Document B');
+    });
   });
 });
 

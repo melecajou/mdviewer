@@ -2,6 +2,27 @@ const { marked } = require('marked');
 const hljs = require('highlight.js');
 const katex = require('katex');
 
+let cryptoModule;
+try {
+  cryptoModule = require('crypto');
+} catch {
+  // Browser environment fallback
+}
+
+function computeHash(str) {
+  if (cryptoModule && typeof cryptoModule.createHash === 'function') {
+    return cryptoModule.createHash('sha256').update(str).digest('hex');
+  }
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return 'h_' + (hash >>> 0).toString(16) + '_' + str.length;
+}
+
+const renderCache = new Map();
+
 // Alert types and icons SVG
 const ALERT_ICONS = {
   note: `<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>`,
@@ -379,6 +400,25 @@ function createCustomRenderer(headings) {
 }
 
 function parseMarkdown(rawContent) {
+  if (!rawContent || typeof rawContent !== 'string') {
+    return {
+      html: '',
+      headings: [],
+      stats: {
+        words: 0,
+        chars: 0,
+        lines: 0,
+        readTimeMinutes: 0
+      }
+    };
+  }
+
+  // Cache basico de renderizacao por conteudo
+  const hash = computeHash(rawContent);
+  if (renderCache.has(hash)) {
+    return renderCache.get(hash);
+  }
+
   const headings = [];
   const { markdown: preparedMarkdown, restoreMath } = processMath(rawContent);
 
@@ -404,7 +444,7 @@ function parseMarkdown(rawContent) {
   const lines = rawContent.split('\n').length;
   const readTimeMinutes = Math.max(1, Math.ceil(words / 200));
 
-  return {
+  const result = {
     html: finalHtml,
     headings,
     stats: {
@@ -414,6 +454,9 @@ function parseMarkdown(rawContent) {
       readTimeMinutes
     }
   };
+
+  renderCache.set(hash, result);
+  return result;
 }
 
 const exportsObj = {
@@ -424,6 +467,7 @@ const exportsObj = {
 
 if (process.env.NODE_ENV === 'test') {
   exportsObj.processMath = processMath;
+  exportsObj.renderCache = renderCache;
 }
 
 module.exports = exportsObj;

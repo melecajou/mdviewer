@@ -30,7 +30,7 @@ const engineSrc = path.join(ROOT_DIR, 'src/preload/markdown-engine.js');
 const engineOut = path.join(DIST_DIR, 'lib/engine.bundle.js');
 
 const esbuildCommand = `npx esbuild "${engineSrc}" ` +
-  `--bundle --minify --format=iife --global-name=MDViewerEngine ` +
+  `--bundle --minify --format=iife --global-name=MDViewerEngine --external:crypto ` +
   `--footer:js="if (typeof window !== 'undefined') window.MDViewerEngine = MDViewerEngine; if (typeof globalThis !== 'undefined') globalThis.MDViewerEngine = MDViewerEngine;" ` +
   `--outfile="${engineOut}"`;
 
