@@ -294,6 +294,47 @@ class MDViewerBase {
     this.clearFindHighlights();
   }
 
+  async copyTextContent(text, button = null, originalText = null, successText = 'Copiado!') {
+    const { navigator, document } = window;
+
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (!successful) {
+          throw new Error('execCommand copy failed');
+        }
+      }
+
+      if (button) {
+        const span = button.querySelector('.copy-text') || button;
+        const orig = originalText !== null ? originalText : span.textContent;
+        span.textContent = successText;
+        setTimeout(() => {
+          span.textContent = orig;
+        }, 1500);
+      }
+    } catch (err) {
+      if (button) {
+        const span = button.querySelector('.copy-text') || button;
+        const orig = originalText !== null ? originalText : span.textContent;
+        span.textContent = 'Erro ao copiar';
+        setTimeout(() => {
+          span.textContent = orig;
+        }, 1500);
+      }
+    }
+  }
+
   copyToClipboard(text, options = {}) {
     const {
       button = null,
