@@ -236,40 +236,85 @@ describe('FileWatcherManager', () => {
   });
 
   describe('clear', () => {
-    it('should close all watchers and clear maps/timers', () => {
+    it('should handle clearing when no watchers or timers exist', () => {
+      expect(watcherManager.watchers.size).toBe(0);
+      expect(watcherManager.debounceTimers.size).toBe(0);
+
+      expect(() => watcherManager.clear()).not.toThrow();
+
+      expect(watcherManager.watchers.size).toBe(0);
+      expect(watcherManager.debounceTimers.size).toBe(0);
+    });
+
+    it('should close all distinct watchers and clear all timers and maps', () => {
       const file1 = 'test1.md';
       const file2 = 'test2.md';
+
+      const mockWatcher1 = {
+        on: jest.fn().mockReturnThis(),
+        close: jest.fn().mockResolvedValue(undefined)
+      };
+      const mockWatcher2 = {
+        on: jest.fn().mockReturnThis(),
+        close: jest.fn().mockResolvedValue(undefined)
+      };
+
+      chokidar.watch
+        .mockReturnValueOnce(mockWatcher1)
+        .mockReturnValueOnce(mockWatcher2);
 
       watcherManager.watch(file1);
       watcherManager.watch(file2);
 
-      const changeHandler1 = mockChokidarWatcher.on.mock.calls.find(call => call[0] === 'change')[1];
+      const changeHandler1 = mockWatcher1.on.mock.calls.find(call => call[0] === 'change')[1];
+      const changeHandler2 = mockWatcher2.on.mock.calls.find(call => call[0] === 'change')[1];
+
       changeHandler1();
+      changeHandler2();
 
       expect(watcherManager.watchers.size).toBe(2);
-      expect(watcherManager.debounceTimers.size).toBe(1);
+      expect(watcherManager.debounceTimers.size).toBe(2);
 
       watcherManager.clear();
 
-      expect(mockChokidarWatcher.close).toHaveBeenCalledTimes(2);
+      expect(mockWatcher1.close).toHaveBeenCalledTimes(1);
+      expect(mockWatcher2.close).toHaveBeenCalledTimes(1);
       expect(watcherManager.watchers.size).toBe(0);
       expect(watcherManager.debounceTimers.size).toBe(0);
 
       jest.advanceTimersByTime(100);
-      expect(mockNotifyCallback).not.toHaveBeenCalled(); // timer was cleared
+      expect(mockNotifyCallback).not.toHaveBeenCalled();
     });
 
-    it('should log error if watcher.close() rejects during clear', async () => {
+    it('should catch and log errors if any watcher.close() rejects during clear', async () => {
       const file1 = 'test1.md';
+      const file2 = 'test2.md';
+
       const closeError = new Error('Clear close failed');
-      mockChokidarWatcher.close.mockRejectedValueOnce(closeError);
+      const mockWatcher1 = {
+        on: jest.fn().mockReturnThis(),
+        close: jest.fn().mockRejectedValue(closeError)
+      };
+      const mockWatcher2 = {
+        on: jest.fn().mockReturnThis(),
+        close: jest.fn().mockResolvedValue(undefined)
+      };
+
+      chokidar.watch
+        .mockReturnValueOnce(mockWatcher1)
+        .mockReturnValueOnce(mockWatcher2);
 
       watcherManager.watch(file1);
+      watcherManager.watch(file2);
+
       watcherManager.clear();
 
       await Promise.resolve();
 
+      expect(mockWatcher1.close).toHaveBeenCalledTimes(1);
+      expect(mockWatcher2.close).toHaveBeenCalledTimes(1);
       expect(console.error).toHaveBeenCalledWith(closeError);
+      expect(watcherManager.watchers.size).toBe(0);
     });
   });
 });
