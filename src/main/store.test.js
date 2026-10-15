@@ -296,6 +296,13 @@ describe('Store', () => {
     let store;
 
     beforeEach(() => {
+      const { app } = require('electron');
+      app.getPath.mockImplementation((name) => {
+        if (name === 'userData') return '/mock/user/data/path';
+        if (name === 'documents') return '/mock/documents';
+        if (name === 'home') return '/mock/home';
+        return `/mock/${name}`;
+      });
       fs.existsSync.mockReturnValue(false); // Default false for initialization
       store = new Store();
       jest.clearAllMocks(); // Clear after init
@@ -324,6 +331,21 @@ describe('Store', () => {
       expect(await store.getLastDirectory('/valid/file.txt')).toBe('/valid');
     });
 
+    it('should ignore non-string or falsy preferredPath inputs and fall back to stored directory', async () => {
+      store.data.lastDirectory = '/last/dir';
+      mockFs(['/last/dir']);
+      expect(await store.getLastDirectory(123)).toBe('/last/dir');
+      expect(await store.getLastDirectory({})).toBe('/last/dir');
+      expect(await store.getLastDirectory(false)).toBe('/last/dir');
+      expect(await store.getLastDirectory('')).toBe('/last/dir');
+    });
+
+    it('should continue to fallback chain if preferredPath is a file whose parent is also invalid', async () => {
+      store.data.lastDirectory = '/last/dir';
+      mockFs(['/last/dir'], ['/invalid/parent/file.txt']);
+      expect(await store.getLastDirectory('/invalid/parent/file.txt')).toBe('/last/dir');
+    });
+
     it('should fallback to lastDirectory if preferredPath is invalid', async () => {
       store.data.lastDirectory = '/last/dir';
       mockFs(['/last/dir']);
@@ -350,6 +372,30 @@ describe('Store', () => {
       expect(await store.getLastDirectory()).toBe('/recent/folder');
     });
 
+    it('should ignore lastDirectory or recentFolders if they point to files rather than directories', async () => {
+      store.data.lastDirectory = '/some/file.txt';
+      store.data.lastOpenedFolder = '/valid/opened';
+      mockFs(['/valid/opened'], ['/some/file.txt']);
+
+      expect(await store.getLastDirectory()).toBe('/valid/opened');
+    });
+
+    it('should handle null or undefined recentFiles and recentFolders gracefully', async () => {
+      store.data.recentFiles = null;
+      store.data.recentFolders = undefined;
+      mockFs(['/mock/documents']);
+
+      expect(await store.getLastDirectory()).toBe('/mock/documents');
+    });
+
+    it('should skip invalid or non-string entries in recentFiles and recentFolders', async () => {
+      store.data.recentFiles = [null, 123, '/valid/recent/file.md'];
+      store.data.recentFolders = [{}, undefined, '/valid/folder'];
+      mockFs(['/valid/recent', '/valid/folder'], ['/valid/recent/file.md']);
+
+      expect(await store.getLastDirectory()).toBe('/valid/recent');
+    });
+
     it('should fallback to documents path', async () => {
       mockFs(['/mock/documents']);
       expect(await store.getLastDirectory()).toBe('/mock/documents');
@@ -373,6 +419,31 @@ describe('Store', () => {
       mockFs(['/valid/opened'], [], ['/error/dir']);
 
       expect(await store.getLastDirectory()).toBe('/valid/opened');
+    });
+
+    it('should fallback to home path when app.getPath("documents") throws an exception', async () => {
+      const { app } = require('electron');
+      app.getPath.mockImplementation((name) => {
+        if (name === 'documents') throw new Error('Path unavailable');
+        if (name === 'home') return '/mock/home';
+        return `/mock/${name}`;
+      });
+
+      mockFs(['/mock/home']);
+
+      expect(await store.getLastDirectory()).toBe('/mock/home');
+    });
+
+    it('should return undefined when both app.getPath("documents") and app.getPath("home") throw exceptions', async () => {
+      const { app } = require('electron');
+      app.getPath.mockImplementation((name) => {
+        if (name === 'documents' || name === 'home') throw new Error('Path unavailable');
+        return `/mock/${name}`;
+      });
+
+      mockFs([]);
+
+      expect(await store.getLastDirectory()).toBeUndefined();
     });
   });
 
