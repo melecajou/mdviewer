@@ -545,6 +545,67 @@ describe('MDViewerBase', () => {
       });
     });
 
+    describe('toggleComment', () => {
+      beforeEach(() => {
+        jest.spyOn(document, 'queryCommandSupported').mockReturnValue(false);
+      });
+
+      it('should return early without errors if sourceTextarea is not set', () => {
+        viewer.sourceTextarea = null;
+        expect(() => viewer.toggleComment()).not.toThrow();
+      });
+
+      it('should comment a single un-commented line', () => {
+        textarea.value = 'Hello world';
+        textarea.selectionStart = 0;
+        textarea.selectionEnd = 11;
+
+        viewer.toggleComment();
+
+        expect(textarea.value).toBe('<!-- Hello world -->');
+      });
+
+      it('should uncomment a single commented line', () => {
+        textarea.value = '<!-- Hello world -->';
+        textarea.selectionStart = 0;
+        textarea.selectionEnd = 20;
+
+        viewer.toggleComment();
+
+        expect(textarea.value).toBe('Hello world');
+      });
+
+      it('should comment multiple un-commented lines', () => {
+        textarea.value = 'Line 1\nLine 2';
+        textarea.selectionStart = 0;
+        textarea.selectionEnd = 13;
+
+        viewer.toggleComment();
+
+        expect(textarea.value).toBe('<!-- Line 1 -->\n<!-- Line 2 -->');
+      });
+
+      it('should uncomment multiple commented lines', () => {
+        textarea.value = '<!-- Line 1 -->\n<!-- Line 2 -->';
+        textarea.selectionStart = 0;
+        textarea.selectionEnd = 31;
+
+        viewer.toggleComment();
+
+        expect(textarea.value).toBe('Line 1\nLine 2');
+      });
+
+      it('should wrap all lines in comments when selection contains a mix of commented and un-commented lines', () => {
+        textarea.value = '<!-- Line 1 -->\nLine 2';
+        textarea.selectionStart = 0;
+        textarea.selectionEnd = 22;
+
+        viewer.toggleComment();
+
+        expect(textarea.value).toBe('<!-- <!-- Line 1 --> -->\n<!-- Line 2 -->');
+      });
+    });
+
     describe('Keyboard Event Handlers', () => {
       beforeEach(() => {
         jest.spyOn(document, 'queryCommandSupported').mockReturnValue(false);

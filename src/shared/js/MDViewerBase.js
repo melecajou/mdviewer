@@ -94,6 +94,32 @@ class MDViewerBase {
     this.insertTextAtCursor(newLines.join('\n'));
   }
 
+  toggleComment() {
+    const textarea = this.sourceTextarea;
+    if (!textarea) return;
+    textarea.focus();
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const val = textarea.value;
+
+    const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+    const lineEnd = val.indexOf('\n', end);
+    const block = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);
+    const lines = block.split('\n');
+
+    const allCommented = lines.every(l => l.startsWith('<!-- ') && l.endsWith(' -->'));
+    const newLines = lines.map(l => {
+      if (allCommented) {
+        return l.substring(5, l.length - 4);
+      } else {
+        return `<!-- ${l} -->`;
+      }
+    });
+
+    textarea.setSelectionRange(lineStart, lineEnd === -1 ? val.length : lineEnd);
+    this.insertTextAtCursor(newLines.join('\n'));
+  }
+
   handleEnterKey(e) {
     const textarea = this.sourceTextarea;
     const start = textarea.selectionStart;
