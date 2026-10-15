@@ -790,6 +790,42 @@ describe('MDViewerExtensionApp', () => {
 
       await app.handleOpenFile();
       expect(clickSpy).toHaveBeenCalled();
+      expect(consoleSpy).toHaveBeenCalledWith(expect.any(Error));
+      consoleSpy.mockRestore();
+    });
+
+    it('should handle AbortError when user cancels file picker without triggering fallback or error log', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const abortError = new Error('The user aborted a request.');
+      abortError.name = 'AbortError';
+      window.showOpenFilePicker = jest.fn().mockRejectedValue(abortError);
+      const clickSpy = jest.spyOn(app.hiddenFileInput, 'click').mockImplementation(() => {});
+
+      await app.handleOpenFile();
+      expect(clickSpy).not.toHaveBeenCalled();
+      expect(consoleSpy).not.toHaveBeenCalled();
+      consoleSpy.mockRestore();
+    });
+
+    it('should fallback to hidden file input when showOpenFilePicker is not supported in window', async () => {
+      delete window.showOpenFilePicker;
+      const clickSpy = jest.spyOn(app.hiddenFileInput, 'click').mockImplementation(() => {});
+
+      await app.handleOpenFile();
+      expect(clickSpy).toHaveBeenCalled();
+    });
+
+    it('should handle file handle reading error in showOpenFilePicker and trigger fallback file input', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const mockHandle = {
+        getFile: jest.fn().mockRejectedValue(new Error('Failed to access file'))
+      };
+      window.showOpenFilePicker = jest.fn().mockResolvedValue([mockHandle]);
+      const clickSpy = jest.spyOn(app.hiddenFileInput, 'click').mockImplementation(() => {});
+
+      await app.handleOpenFile();
+      expect(clickSpy).toHaveBeenCalled();
+      expect(consoleSpy).toHaveBeenCalledWith(expect.any(Error));
       consoleSpy.mockRestore();
     });
 
