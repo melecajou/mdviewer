@@ -850,34 +850,52 @@ class MDViewerExtensionApp extends MDViewerBase {
   }
 
   renderOpenFilesFallback() {
+    this.fileTreeContainer.innerHTML = '';
     if (this.tabs.length > 0) {
-      this.fileTreeContainer.innerHTML = `
-        <div class="sidebar-section-title">Arquivos Abertos (${this.tabs.length})</div>
-        <div class="sidebar-open-files-list">
-          ${this.tabs.map(t => `
-            <div class="file-tree-item ${t.id === this.activeTabId ? 'active' : ''}" data-tab-id="${t.id}" title="${t.path}">
-              <svg class="file-icon" viewBox="0 0 16 16" width="14" height="14" fill="#3fb950">
-                <path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586a1.75 1.75 0 0 1 1.237.513l2.914 2.914c.328.328.513.774.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.06v2.69c0 .138.112.25.25.25h2.69Z"/>
-              </svg>
-              <span class="tree-item-name">${t.title}</span>
-            </div>
-          `).join('')}
-        </div>
-        <div class="sidebar-folder-prompt">
-          <p>Navegue por todos os arquivos Markdown de uma pasta do seu computador:</p>
-          <button class="btn-primary" id="btn-sidebar-prompt-open-folder">
-            <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75ZM1.5 2.75a.25.25 0 0 1 .25-.25H5c.18 0 .36.09.47.23l1.15 1.53A1.75 1.75 0 0 0 8.02 5h6.23a.25.25 0 0 1 .25.25v8a.25.25 0 0 1-.25.25H1.75a.25.25 0 0 1-.25-.25Z"/></svg>
-            <span>Abrir Pasta do Projeto</span>
-          </button>
-        </div>
-      `;
-      this.fileTreeContainer.querySelectorAll('.file-tree-item').forEach(el => {
-        el.addEventListener('click', () => {
-          const tabId = el.getAttribute('data-tab-id');
-          if (tabId) this.activateTab(tabId);
+      const sectionTitle = document.createElement('div');
+      sectionTitle.className = 'sidebar-section-title';
+      sectionTitle.textContent = `Arquivos Abertos (${this.tabs.length})`;
+      this.fileTreeContainer.appendChild(sectionTitle);
+
+      const openFilesList = document.createElement('div');
+      openFilesList.className = 'sidebar-open-files-list';
+
+      this.tabs.forEach(t => {
+        const item = document.createElement('div');
+        item.className = `file-tree-item ${t.id === this.activeTabId ? 'active' : ''}`;
+        item.setAttribute('data-tab-id', t.id);
+        item.title = t.path || t.title || '';
+
+        item.innerHTML = `
+          <svg class="file-icon" viewBox="0 0 16 16" width="14" height="14" fill="#3fb950">
+            <path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586a1.75 1.75 0 0 1 1.237.513l2.914 2.914c.328.328.513.774.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.06v2.69c0 .138.112.25.25.25h2.69Z"/>
+          </svg>
+          <span class="tree-item-name"></span>
+        `;
+        const nameEl = item.querySelector('.tree-item-name');
+        if (nameEl) nameEl.textContent = t.title;
+
+        item.addEventListener('click', () => {
+          this.activateTab(t.id);
         });
+
+        openFilesList.appendChild(item);
       });
-      const promptBtn = document.getElementById('btn-sidebar-prompt-open-folder');
+
+      this.fileTreeContainer.appendChild(openFilesList);
+
+      const promptDiv = document.createElement('div');
+      promptDiv.className = 'sidebar-folder-prompt';
+      promptDiv.innerHTML = `
+        <p>Navegue por todos os arquivos Markdown de uma pasta do seu computador:</p>
+        <button class="btn-primary" id="btn-sidebar-prompt-open-folder">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75ZM1.5 2.75a.25.25 0 0 1 .25-.25H5c.18 0 .36.09.47.23l1.15 1.53A1.75 1.75 0 0 0 8.02 5h6.23a.25.25 0 0 1 .25.25v8a.25.25 0 0 1-.25.25H1.75a.25.25 0 0 1-.25-.25Z"/></svg>
+          <span>Abrir Pasta do Projeto</span>
+        </button>
+      `;
+      this.fileTreeContainer.appendChild(promptDiv);
+
+      const promptBtn = promptDiv.querySelector('#btn-sidebar-prompt-open-folder');
       if (promptBtn) {
         promptBtn.addEventListener('click', () => this.handleOpenFolder());
       }

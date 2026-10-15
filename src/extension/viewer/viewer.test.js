@@ -651,6 +651,23 @@ describe('MDViewerExtensionApp', () => {
       expect(document.querySelector('#tabs-bar img')).toBeNull();
     });
 
+    it('should safely render open files fallback without XSS vulnerabilities in titles or paths', () => {
+      app.tabs = [
+        { id: 'tab1', title: '<img src=x onerror=alert("xss-title")>', path: '/path/<script>alert("xss-path")</script>.md' }
+      ];
+      app.currentTree = [];
+      app.renderOpenFilesFallback();
+
+      const container = document.getElementById('file-tree-container');
+      expect(container.querySelector('img')).toBeNull();
+      expect(container.querySelector('script')).toBeNull();
+
+      const item = container.querySelector('.file-tree-item');
+      expect(item).not.toBeNull();
+      expect(item.getAttribute('title')).toBe('/path/<script>alert("xss-path")</script>.md');
+      expect(item.querySelector('.tree-item-name').textContent).toBe('<img src=x onerror=alert("xss-title")>');
+    });
+
     it('should activate existing tab if path matches', () => {
       app.openDocumentTab('Doc1.md', '# Content', 'Doc1.md');
       const firstTabId = app.tabs[0].id;

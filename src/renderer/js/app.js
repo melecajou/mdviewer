@@ -600,7 +600,7 @@ class MDViewerApp extends _MDViewerBase {
 
     const closeBtn = document.createElement('button');
     closeBtn.className = 'tab-close-btn';
-    closeBtn.innerHTML = '✕';
+    closeBtn.textContent = '✕';
     closeBtn.title = 'Fechar Aba (Ctrl+W)';
     closeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1203,17 +1203,35 @@ class MDViewerApp extends _MDViewerBase {
         itemRow.className = 'tree-item tree-folder' + (defaultCollapsed ? '' : ' expanded');
         const hasChildren = item.children && item.children.length > 0;
 
-        itemRow.innerHTML = `
-          <span class="tree-arrow ${hasChildren ? '' : 'empty'}">
-            <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor">
-              <path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/>
-            </svg>
-          </span>
-          <svg viewBox="0 0 16 16" width="14" height="14" fill="#58a6ff"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z"/></svg>
-          <span class="tree-item-name" style="font-weight: 500;"></span>
-        `;
-        const nameEl = itemRow.querySelector('.tree-item-name');
-        if (nameEl) nameEl.textContent = item.name;
+        const arrowSpan = document.createElement('span');
+        arrowSpan.className = `tree-arrow ${hasChildren ? '' : 'empty'}`;
+        const arrowSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        arrowSvg.setAttribute('viewBox', '0 0 16 16');
+        arrowSvg.setAttribute('width', '10');
+        arrowSvg.setAttribute('height', '10');
+        arrowSvg.setAttribute('fill', 'currentColor');
+        const arrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        arrowPath.setAttribute('d', 'M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z');
+        arrowSvg.appendChild(arrowPath);
+        arrowSpan.appendChild(arrowSvg);
+
+        const folderSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        folderSvg.setAttribute('viewBox', '0 0 16 16');
+        folderSvg.setAttribute('width', '14');
+        folderSvg.setAttribute('height', '14');
+        folderSvg.setAttribute('fill', '#58a6ff');
+        const folderPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        folderPath.setAttribute('d', 'M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z');
+        folderSvg.appendChild(folderPath);
+
+        const nameEl = document.createElement('span');
+        nameEl.className = 'tree-item-name';
+        nameEl.style.fontWeight = '500';
+        nameEl.textContent = item.name;
+
+        itemRow.appendChild(arrowSpan);
+        itemRow.appendChild(folderSvg);
+        itemRow.appendChild(nameEl);
         li.appendChild(itemRow);
 
         if (hasChildren) {
@@ -1235,19 +1253,31 @@ class MDViewerApp extends _MDViewerBase {
         }
       } else {
         const isMd = item.isMarkdown;
-        const iconSvg = isMd
-          ? `<svg viewBox="0 0 16 16" width="14" height="14" fill="#3fb950"><path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586a1.75 1.75 0 0 1 1.237.513l2.914 2.914c.328.328.513.774.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.06v2.69c0 .138.112.25.25.25h2.69Z"/></svg>`
-          : `<svg viewBox="0 0 16 16" width="14" height="14" fill="var(--text-muted)"><path d="M2 1.75C2 .784 2.784 0 3.75 0h8.5C13.216 0 14 .784 14 1.75v12.5A1.75 1.75 0 0 1 12.25 16h-8.5A1.75 1.75 0 0 1 2 14.25ZM3.75 1.5a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25Z"/></svg>`;
+
+        const spacerSpan = document.createElement('span');
+        spacerSpan.className = 'tree-arrow-spacer';
+
+        const fileSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        fileSvg.setAttribute('viewBox', '0 0 16 16');
+        fileSvg.setAttribute('width', '14');
+        fileSvg.setAttribute('height', '14');
+        fileSvg.setAttribute('fill', isMd ? '#3fb950' : 'var(--text-muted)');
+        const filePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        filePath.setAttribute('d', isMd
+          ? 'M2 1.75C2 .784 2.784 0 3.75 0h6.586a1.75 1.75 0 0 1 1.237.513l2.914 2.914c.328.328.513.774.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.06v2.69c0 .138.112.25.25.25h2.69Z'
+          : 'M2 1.75C2 .784 2.784 0 3.75 0h8.5C13.216 0 14 .784 14 1.75v12.5A1.75 1.75 0 0 1 12.25 16h-8.5A1.75 1.75 0 0 1 2 14.25ZM3.75 1.5a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25Z'
+        );
+        fileSvg.appendChild(filePath);
+
+        const nameEl = document.createElement('span');
+        nameEl.className = 'tree-item-name';
+        nameEl.textContent = item.name;
 
         itemRow.className = 'tree-item tree-file';
-        itemRow.innerHTML = `
-          <span class="tree-arrow-spacer"></span>
-          ${iconSvg}
-          <span class="tree-item-name"></span>
-        `;
-        const nameEl = itemRow.querySelector('.tree-item-name');
-        if (nameEl) nameEl.textContent = item.name;
         itemRow.title = item.path;
+        itemRow.appendChild(spacerSpan);
+        itemRow.appendChild(fileSvg);
+        itemRow.appendChild(nameEl);
 
         itemRow.addEventListener('click', () => {
           if (isMd) {
