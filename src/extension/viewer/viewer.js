@@ -1664,22 +1664,39 @@ class MDViewerExtensionApp extends MDViewerBase {
 
   exportToHtml() {
     const tab = this.getActiveTab();
-    const title = tab ? tab.title.replace(/\.[^/.]+$/, '') : 'documento';
+    const rawTitle = tab ? tab.title.replace(/\.[^/.]+$/, '') : 'documento';
     const contentHtml = this.markdownContainer.innerHTML;
-    const theme = document.documentElement.getAttribute('data-theme') || 'github-dark';
+    const rawTheme = document.documentElement.getAttribute('data-theme') || 'github-dark';
+
+    const escapeHtml = (unsafe) => {
+      return (unsafe || '').toString()
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    };
+
+    const safeTitle = escapeHtml(rawTitle);
+    const safeTheme = escapeHtml(rawTheme);
+
+    const purify = typeof DOMPurify !== 'undefined' ? DOMPurify : null;
+    const sanitizedContent = purify && typeof purify.sanitize === 'function'
+      ? purify.sanitize(contentHtml, { USE_PROFILES: { html: true } })
+      : contentHtml;
 
     const fullHtml = `<!DOCTYPE html>
-<html lang="pt-BR" data-theme="${theme}">
+<html lang="pt-BR" data-theme="${safeTheme}">
 <head>
   <meta charset="UTF-8">
-  <title>${title}</title>
+  <title>${safeTitle}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; padding: 40px; margin: 0 auto; max-width: 900px; }
   </style>
 </head>
 <body>
   <div class="markdown-body">
-    ${contentHtml}
+    ${sanitizedContent}
   </div>
 </body>
 </html>`;
@@ -1688,7 +1705,7 @@ class MDViewerExtensionApp extends MDViewerBase {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${title}.html`;
+    a.download = `${rawTitle}.html`;
     a.click();
     URL.revokeObjectURL(url);
   }

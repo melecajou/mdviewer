@@ -150,6 +150,41 @@ describe('MDViewerApp - bindEvents refactoring', () => {
     expect(app.handleSaveFile).toHaveBeenCalledTimes(1);
   });
 
+  it('should sanitize HTML content and escape dynamic parameters during HTML export', async () => {
+    const DOMPurifyModule = require('dompurify');
+    window.electronAPI.exportHtml = jest.fn();
+    window.electronAPI.parseMarkdown = jest.fn().mockReturnValue({
+      html: '<h1>Title</h1><script>alert("content-xss")</script>'
+    });
+    window.DOMPurify = DOMPurifyModule;
+
+    document.documentElement.setAttribute('data-theme', 'dark"><script>alert("theme-xss")</script>');
+
+    app.tabs = [{
+      id: 'tab1',
+      fileName: '<script>alert("filename-xss")</script>.md',
+      content: '# Hello',
+      dirName: '/path'
+    }];
+    app.activeTabId = 'tab1';
+
+    await app.exportToHtml();
+
+    expect(window.electronAPI.exportHtml).toHaveBeenCalled();
+    const payload = window.electronAPI.exportHtml.mock.calls[0][0];
+    const htmlContent = payload.htmlContent;
+
+    expect(htmlContent).not.toContain('<script>alert("theme-xss")</script>');
+    expect(htmlContent).toContain('&quot;&gt;&lt;script&gt;alert(&quot;theme-xss&quot;)&lt;/script&gt;');
+    expect(htmlContent).not.toContain('<script>alert("filename-xss")</script>');
+    expect(htmlContent).toContain('&lt;script&gt;alert(&quot;filename-xss&quot;)&lt;/script&gt;');
+    expect(htmlContent).not.toContain('<script>alert("content-xss")</script>');
+    expect(htmlContent).toContain('<h1>Title</h1>');
+
+    delete window.DOMPurify;
+    document.documentElement.removeAttribute('data-theme');
+  });
+
   it('should evaluate app.js cleanly in a browser environment with global.MDViewerBase without SyntaxError', () => {
     const fs = require('fs');
     const path = require('path');
