@@ -961,6 +961,36 @@ describe('MDViewerExtensionApp', () => {
       expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:html-url');
     });
 
+    it('should sanitize HTML content and escape dynamic parameters during HTML export', () => {
+      let createdBlobContent = '';
+      URL.createObjectURL = jest.fn().mockReturnValue('blob:html-url');
+      URL.revokeObjectURL = jest.fn();
+
+      window.DOMPurify = DOMPurify;
+
+      const origBlob = global.Blob;
+      global.Blob = jest.fn().mockImplementation((parts, options) => {
+        createdBlobContent = parts.join('');
+        return new origBlob(parts, options);
+      });
+
+      document.documentElement.setAttribute('data-theme', 'dark"><script>alert("theme-xss")</script>');
+      app.openDocumentTab('<script>alert("title-xss")</script>.md', 'Hello world', 'Doc.md');
+      app.markdownContainer.innerHTML = '<h1>Header</h1><script>alert("content-xss")</script>';
+
+      app.exportToHtml();
+
+      expect(createdBlobContent).not.toContain('<script>alert("theme-xss")</script>');
+      expect(createdBlobContent).toContain('&quot;&gt;&lt;script&gt;alert(&quot;theme-xss&quot;)&lt;/script&gt;');
+      expect(createdBlobContent).not.toContain('<script>alert("title-xss")</script>');
+      expect(createdBlobContent).toContain('&lt;script&gt;alert(&quot;title-xss&quot;)&lt;/script&gt;');
+      expect(createdBlobContent).not.toContain('<script>alert("content-xss")</script>');
+      expect(createdBlobContent).toContain('<h1>Header</h1>');
+
+      global.Blob = origBlob;
+      document.documentElement.removeAttribute('data-theme');
+    });
+
     it('should open sample document', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,

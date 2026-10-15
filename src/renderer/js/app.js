@@ -1584,16 +1584,32 @@ class MDViewerApp extends _MDViewerBase {
     const preferredDir = activeTab.dirName || this.currentFolder;
     const parsed = window.electronAPI.parseMarkdown(activeTab.content);
 
+    const escapeHtml = (unsafe) => {
+      return (unsafe || '').toString()
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    };
+
     // Get current theme styles
-    const themeName = document.documentElement.getAttribute('data-theme') || 'github-dark';
+    const rawTheme = document.documentElement.getAttribute('data-theme') || 'github-dark';
+    const safeTheme = escapeHtml(rawTheme);
+    const safeFileName = escapeHtml(activeTab.fileName);
+
+    const purify = typeof DOMPurify !== 'undefined' ? DOMPurify : null;
+    const sanitizedHtml = purify && typeof purify.sanitize === 'function'
+      ? purify.sanitize(parsed.html, { USE_PROFILES: { html: true } })
+      : parsed.html;
 
     // Standalone HTML template with all inline styling
     const fullHtml = `<!DOCTYPE html>
-<html lang="pt-BR" data-theme="${themeName}">
+<html lang="pt-BR" data-theme="${safeTheme}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${activeTab.fileName}</title>
+  <title>${safeFileName}</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">
   <style>
     body {
@@ -1624,7 +1640,7 @@ class MDViewerApp extends _MDViewerBase {
 </head>
 <body>
   <div class="markdown-body">
-    ${parsed.html}
+    ${sanitizedHtml}
   </div>
 </body>
 </html>`;
