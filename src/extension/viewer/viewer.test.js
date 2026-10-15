@@ -865,6 +865,29 @@ describe('MDViewerExtensionApp', () => {
       expect(fileItem.querySelector('.tree-item-name').textContent).toBe('<script>alert("xss-file")</script>.md');
     });
 
+    it('should safely render open files fallback list without XSS vulnerabilities', () => {
+      app.tabs = [
+        {
+          id: 'tab_xss_1',
+          title: '<img src=x onerror=alert("xss-tab-title")>',
+          path: '/path/to/<script>alert("xss-tab-path")</script>.md'
+        }
+      ];
+
+      app.renderOpenFilesFallback();
+
+      const container = app.fileTreeContainer;
+      expect(container.querySelector('img')).toBeNull();
+      expect(container.querySelector('script')).toBeNull();
+
+      const itemEl = container.querySelector('.file-tree-item');
+      expect(itemEl).not.toBeNull();
+      expect(itemEl.getAttribute('title')).toBe('/path/to/<script>alert("xss-tab-path")</script>.md');
+
+      const nameSpan = itemEl.querySelector('.tree-item-name');
+      expect(nameSpan.textContent).toBe('<img src=x onerror=alert("xss-tab-title")>');
+    });
+
     it('should read file object via readFileObject', async () => {
       const mockFile = { name: 'ReadObj.md', text: jest.fn().mockResolvedValue('# Read Obj') };
       await app.readFileObject(mockFile);
