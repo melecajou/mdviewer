@@ -185,8 +185,15 @@ class MDViewerBase {
     this.handleEditorInput();
   }
 
+  insertMarkdown(before, after, defaultText = '') {
+    const textarea = this.sourceTextarea;
+    if (!textarea) return;
+    this.formatWrap(before, after, defaultText);
+  }
+
   formatWrap(before, after, defaultText = 'texto') {
     const textarea = this.sourceTextarea;
+    if (!textarea) return;
     textarea.focus();
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;

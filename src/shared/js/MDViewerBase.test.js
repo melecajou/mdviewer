@@ -19,6 +19,112 @@ describe('MDViewerBase', () => {
     jest.clearAllMocks();
   });
 
+  describe('getActiveTab', () => {
+    it('should return undefined when activeTabId is null or not found', () => {
+      viewer.tabs = [{ id: 'tab1', title: 'Tab 1' }];
+      viewer.activeTabId = null;
+      expect(viewer.getActiveTab()).toBeUndefined();
+
+      viewer.activeTabId = 'non-existent';
+      expect(viewer.getActiveTab()).toBeUndefined();
+    });
+
+    it('should return the active tab object matching activeTabId', () => {
+      const tab1 = { id: 'tab1', title: 'Tab 1' };
+      const tab2 = { id: 'tab2', title: 'Tab 2' };
+      viewer.tabs = [tab1, tab2];
+      viewer.activeTabId = 'tab2';
+
+      expect(viewer.getActiveTab()).toEqual(tab2);
+    });
+  });
+
+  describe('toggleSidebar', () => {
+    beforeEach(() => {
+      viewer.appSidebar = document.createElement('div');
+      viewer.saveSettings = jest.fn();
+    });
+
+    it('should toggle isSidebarCollapsed state and call saveSettings when forceState is null', () => {
+      expect(viewer.isSidebarCollapsed).toBe(false);
+
+      viewer.toggleSidebar();
+      expect(viewer.isSidebarCollapsed).toBe(true);
+      expect(viewer.appSidebar.classList.contains('collapsed')).toBe(true);
+      expect(viewer.saveSettings).toHaveBeenCalledTimes(1);
+
+      viewer.toggleSidebar();
+      expect(viewer.isSidebarCollapsed).toBe(false);
+      expect(viewer.appSidebar.classList.contains('collapsed')).toBe(false);
+      expect(viewer.saveSettings).toHaveBeenCalledTimes(2);
+    });
+
+    it('should set collapsed state based on forceState boolean argument', () => {
+      viewer.toggleSidebar(true);
+      expect(viewer.isSidebarCollapsed).toBe(false);
+      expect(viewer.appSidebar.classList.contains('collapsed')).toBe(false);
+
+      viewer.toggleSidebar(false);
+      expect(viewer.isSidebarCollapsed).toBe(true);
+      expect(viewer.appSidebar.classList.contains('collapsed')).toBe(true);
+    });
+  });
+
+  describe('switchSidebarTab', () => {
+    beforeEach(() => {
+      viewer.saveSettings = jest.fn();
+
+      const btn1 = document.createElement('button');
+      btn1.dataset.tab = 'files';
+      const btn2 = document.createElement('button');
+      btn2.dataset.tab = 'toc';
+      viewer.sidebarTabBtns = [btn1, btn2];
+
+      const pane1 = document.createElement('div');
+      pane1.id = 'pane-files';
+      const pane2 = document.createElement('div');
+      pane2.id = 'pane-toc';
+      viewer.sidebarPanes = [pane1, pane2];
+    });
+
+    it('should toggle active class on sidebar buttons and panes for target tab', () => {
+      viewer.switchSidebarTab('toc');
+
+      expect(viewer.sidebarTabBtns[0].classList.contains('active')).toBe(false);
+      expect(viewer.sidebarTabBtns[1].classList.contains('active')).toBe(true);
+
+      expect(viewer.sidebarPanes[0].classList.contains('active')).toBe(false);
+      expect(viewer.sidebarPanes[1].classList.contains('active')).toBe(true);
+
+      expect(viewer.saveSettings).toHaveBeenCalled();
+    });
+  });
+
+  describe('resetZoom', () => {
+    it('should reset zoomLevel to 1.0 and call applyZoom', () => {
+      viewer.zoomLevel = 1.5;
+      viewer.applyZoom = jest.fn();
+
+      viewer.resetZoom();
+
+      expect(viewer.zoomLevel).toBe(1.0);
+      expect(viewer.applyZoom).toHaveBeenCalled();
+    });
+  });
+
+  describe('closeFindBar', () => {
+    it('should remove visible class from findBar and clear highlights', () => {
+      viewer.findBar = document.createElement('div');
+      viewer.findBar.classList.add('visible');
+      viewer.clearFindHighlights = jest.fn();
+
+      viewer.closeFindBar();
+
+      expect(viewer.findBar.classList.contains('visible')).toBe(false);
+      expect(viewer.clearFindHighlights).toHaveBeenCalled();
+    });
+  });
+
   describe('initMermaid', () => {
     it('should not throw if window.mermaid is undefined', () => {
       expect(() => viewer.initMermaid()).not.toThrow();
@@ -296,9 +402,79 @@ describe('MDViewerBase', () => {
       });
     });
 
+    describe('insertMarkdown', () => {
+      beforeEach(() => {
+        jest.spyOn(document, 'queryCommandSupported').mockReturnValue(false);
+      });
+
+      it('should return early without error if sourceTextarea is missing', () => {
+        viewer.sourceTextarea = null;
+
+        expect(() => {
+          viewer.insertMarkdown('**', '**', 'sample');
+        }).not.toThrow();
+      });
+
+      it('should wrap selected text with before and after strings', () => {
+        textarea.value = 'Hello world';
+        textarea.selectionStart = 6;
+        textarea.selectionEnd = 11;
+
+        viewer.insertMarkdown('**', '**', 'negrito');
+
+        expect(textarea.value).toBe('Hello **world**');
+        expect(textarea.selectionStart).toBe(8);
+        expect(textarea.selectionEnd).toBe(13);
+      });
+
+      it('should unwrap text if it is already wrapped with before and after strings', () => {
+        textarea.value = 'Hello **world**';
+        textarea.selectionStart = 8;
+        textarea.selectionEnd = 13;
+
+        viewer.insertMarkdown('**', '**', 'negrito');
+
+        expect(textarea.value).toBe('Hello world');
+        expect(textarea.selectionStart).toBe(6);
+        expect(textarea.selectionEnd).toBe(11);
+      });
+
+      it('should insert defaultText wrapped when no text is selected', () => {
+        textarea.value = 'Hello ';
+        textarea.selectionStart = 6;
+        textarea.selectionEnd = 6;
+
+        viewer.insertMarkdown('*', '*', 'itálico');
+
+        expect(textarea.value).toBe('Hello *itálico*');
+        expect(textarea.selectionStart).toBe(7);
+        expect(textarea.selectionEnd).toBe(14);
+      });
+
+      it('should default defaultText to empty string when not provided', () => {
+        textarea.value = 'Text: ';
+        textarea.selectionStart = 6;
+        textarea.selectionEnd = 6;
+
+        viewer.insertMarkdown('`', '`');
+
+        expect(textarea.value).toBe('Text: ``');
+        expect(textarea.selectionStart).toBe(7);
+        expect(textarea.selectionEnd).toBe(7);
+      });
+    });
+
     describe('formatWrap', () => {
       beforeEach(() => {
         jest.spyOn(document, 'queryCommandSupported').mockReturnValue(false);
+      });
+
+      it('should return early without error if sourceTextarea is missing', () => {
+        viewer.sourceTextarea = null;
+
+        expect(() => {
+          viewer.formatWrap('**', '**', 'sample');
+        }).not.toThrow();
       });
 
       it('should wrap selected text with before and after strings', () => {
