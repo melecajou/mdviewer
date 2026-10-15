@@ -316,6 +316,217 @@ describe('MDViewerBase', () => {
     });
   });
 
+  describe('copyTextContent', () => {
+    let originalIsSecureContext;
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      originalIsSecureContext = window.isSecureContext;
+      Object.defineProperty(window, 'isSecureContext', {
+        value: true,
+        configurable: true,
+        writable: true
+      });
+      Object.defineProperty(navigator, 'clipboard', {
+        value: {
+          writeText: jest.fn().mockResolvedValue(undefined)
+        },
+        configurable: true
+      });
+    });
+
+    afterEach(() => {
+      jest.clearAllTimers();
+      jest.useRealTimers();
+      Object.defineProperty(window, 'isSecureContext', {
+        value: originalIsSecureContext,
+        configurable: true,
+        writable: true
+      });
+    });
+
+    describe('secure context (navigator.clipboard)', () => {
+      it('should write text using navigator.clipboard in secure context', async () => {
+        await viewer.copyTextContent('Sample text to copy');
+        expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Sample text to copy');
+      });
+
+      it('should update button span text with successText and restore after 1500ms', async () => {
+        const button = document.createElement('button');
+        const span = document.createElement('span');
+        span.className = 'copy-text';
+        span.textContent = 'Copy Code';
+        button.appendChild(span);
+
+        await viewer.copyTextContent('code snippet', button);
+
+        expect(navigator.clipboard.writeText).toHaveBeenCalledWith('code snippet');
+        expect(span.textContent).toBe('Copiado!');
+
+        jest.advanceTimersByTime(1499);
+        expect(span.textContent).toBe('Copiado!');
+
+        jest.advanceTimersByTime(1);
+        expect(span.textContent).toBe('Copy Code');
+      });
+
+      it('should update button directly when no .copy-text span is present', async () => {
+        const button = document.createElement('button');
+        button.textContent = 'Copy';
+
+        await viewer.copyTextContent('hello world', button, null, 'Copied!');
+
+        expect(navigator.clipboard.writeText).toHaveBeenCalledWith('hello world');
+        expect(button.textContent).toBe('Copied!');
+
+        jest.advanceTimersByTime(1500);
+        expect(button.textContent).toBe('Copy');
+      });
+    });
+
+    describe('fallback context (execCommand)', () => {
+      beforeEach(() => {
+        document.execCommand = jest.fn().mockReturnValue(true);
+      });
+
+      it('should fallback to document.execCommand when window.isSecureContext is false', async () => {
+        Object.defineProperty(window, 'isSecureContext', {
+          value: false,
+          configurable: true,
+          writable: true
+        });
+
+        const appendSpy = jest.spyOn(document.body, 'appendChild');
+        const removeSpy = jest.spyOn(document.body, 'removeChild');
+
+        await viewer.copyTextContent('fallback text');
+
+        expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+        expect(appendSpy).toHaveBeenCalled();
+        expect(document.execCommand).toHaveBeenCalledWith('copy');
+        expect(removeSpy).toHaveBeenCalled();
+
+        appendSpy.mockRestore();
+        removeSpy.mockRestore();
+      });
+
+      it('should fallback to document.execCommand when navigator.clipboard is undefined', async () => {
+        delete navigator.clipboard;
+
+        const appendSpy = jest.spyOn(document.body, 'appendChild');
+        const removeSpy = jest.spyOn(document.body, 'removeChild');
+
+        await viewer.copyTextContent('fallback text');
+
+        expect(appendSpy).toHaveBeenCalled();
+        expect(document.execCommand).toHaveBeenCalledWith('copy');
+        expect(removeSpy).toHaveBeenCalled();
+
+        appendSpy.mockRestore();
+        removeSpy.mockRestore();
+      });
+
+      it('should update button text on successful fallback copy', async () => {
+        Object.defineProperty(window, 'isSecureContext', {
+          value: false,
+          configurable: true,
+          writable: true
+        });
+
+        const button = document.createElement('button');
+        const span = document.createElement('span');
+        span.className = 'copy-text';
+        span.textContent = 'Copy Fallback';
+        button.appendChild(span);
+
+        await viewer.copyTextContent('fallback snippet', button);
+
+        expect(document.execCommand).toHaveBeenCalledWith('copy');
+        expect(span.textContent).toBe('Copiado!');
+
+        jest.advanceTimersByTime(1500);
+        expect(span.textContent).toBe('Copy Fallback');
+      });
+    });
+
+    describe('error handling and edge cases', () => {
+      it('should handle rejection in navigator.clipboard.writeText and show error text on button', async () => {
+        navigator.clipboard.writeText.mockRejectedValue(new Error('Permission denied'));
+
+        const button = document.createElement('button');
+        const span = document.createElement('span');
+        span.className = 'copy-text';
+        span.textContent = 'Copy Code';
+        button.appendChild(span);
+
+        await viewer.copyTextContent('text', button);
+
+        expect(span.textContent).toBe('Erro ao copiar');
+
+        jest.advanceTimersByTime(1500);
+        expect(span.textContent).toBe('Copy Code');
+      });
+
+      it('should handle failure in fallback execCommand and show error text on button', async () => {
+        Object.defineProperty(window, 'isSecureContext', {
+          value: false,
+          configurable: true,
+          writable: true
+        });
+
+        document.execCommand = jest.fn().mockImplementation(() => {
+          throw new Error('execCommand error');
+        });
+
+        const button = document.createElement('button');
+        button.textContent = 'Copy Code';
+
+        await viewer.copyTextContent('text', button);
+
+        expect(button.textContent).toBe('Erro ao copiar');
+
+        jest.advanceTimersByTime(1500);
+        expect(button.textContent).toBe('Copy Code');
+      });
+
+      it('should handle fallback execCommand returning false', async () => {
+        Object.defineProperty(window, 'isSecureContext', {
+          value: false,
+          configurable: true,
+          writable: true
+        });
+
+        document.execCommand = jest.fn().mockReturnValue(false);
+
+        const button = document.createElement('button');
+        button.textContent = 'Copy Code';
+
+        await viewer.copyTextContent('text', button);
+
+        expect(button.textContent).toBe('Erro ao copiar');
+
+        jest.advanceTimersByTime(1500);
+        expect(button.textContent).toBe('Copy Code');
+      });
+
+      it('should support explicit originalText parameter', async () => {
+        const button = document.createElement('button');
+        button.textContent = 'Current Text';
+
+        await viewer.copyTextContent('text', button, 'Custom Original Text', 'Sucesso!');
+
+        expect(button.textContent).toBe('Sucesso!');
+
+        jest.advanceTimersByTime(1500);
+        expect(button.textContent).toBe('Custom Original Text');
+      });
+
+      it('should safely execute without a button parameter', async () => {
+        await expect(viewer.copyTextContent('text without button')).resolves.not.toThrow();
+      });
+    });
+  });
+
   describe('Formatting and Editor Methods', () => {
     let textarea;
 
