@@ -546,7 +546,7 @@ ipcMain.handle('dialog:open-file', async (event, preferredPath) => {
       if (!isSystemOrRootDirectory(parentDir)) {
         addAllowedPath(parentDir);
       }
-      store.setLastDirectory(parentDir);
+      await store.setLastDirectory(parentDir);
       return selected;
     }
   } catch (err) {
@@ -573,7 +573,7 @@ ipcMain.handle('dialog:open-folder', async (event, preferredPath) => {
     if (!result.canceled && result.filePaths.length > 0) {
       const selected = result.filePaths[0];
       addAllowedPath(selected);
-      store.setLastDirectory(selected);
+      await store.setLastDirectory(selected);
       store.set('lastOpenedFolder', selected);
       return selected;
     }
@@ -597,7 +597,7 @@ ipcMain.handle('file:read', async (event, filePath) => {
     const content = await fs.promises.readFile(resolvedPath, 'utf-8');
     const stats = await fs.promises.stat(resolvedPath);
     store.addRecentFile(resolvedPath);
-    store.setLastDirectory(path.dirname(resolvedPath));
+    await store.setLastDirectory(path.dirname(resolvedPath));
     return {
       success: true,
       filePath: resolvedPath,
@@ -672,7 +672,7 @@ ipcMain.handle('file:save-as', async (event, { content, defaultName, defaultDir 
       await fs.promises.writeFile(resolvedPath, content, 'utf-8');
       const stats = await fs.promises.stat(resolvedPath);
       store.addRecentFile(resolvedPath);
-      store.setLastDirectory(path.dirname(resolvedPath));
+      await store.setLastDirectory(path.dirname(resolvedPath));
       return {
         success: true,
         filePath: resolvedPath,
@@ -716,7 +716,7 @@ ipcMain.handle('file:read-dir', async (event, dirPath) => {
     const resolvedDir = path.resolve(dirPath);
     store.addRecentFolder(resolvedDir);
     store.set('lastOpenedFolder', resolvedDir);
-    store.setLastDirectory(resolvedDir);
+    await store.setLastDirectory(resolvedDir);
 
     async function scanDirectory(dir, depth = 0) {
       if (depth > 5) return []; // Limit recursion depth
@@ -800,7 +800,7 @@ ipcMain.handle('export:html', async (event, { defaultName, htmlContent, defaultD
   if (!result.canceled && result.filePath) {
     try {
       await fs.promises.writeFile(result.filePath, htmlContent, 'utf-8');
-      store.setLastDirectory(path.dirname(result.filePath));
+      await store.setLastDirectory(path.dirname(result.filePath));
       return { success: true, filePath: result.filePath };
     } catch (err) {
       return { success: false, error: err.message };
@@ -833,7 +833,7 @@ ipcMain.handle('export:pdf', async (event, { defaultName, defaultDir }) => {
         pageSize: 'A4'
       });
       await fs.promises.writeFile(result.filePath, data);
-      store.setLastDirectory(path.dirname(result.filePath));
+      await store.setLastDirectory(path.dirname(result.filePath));
       return { success: true, filePath: result.filePath };
     } catch (err) {
       return { success: false, error: err.message };

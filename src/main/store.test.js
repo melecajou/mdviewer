@@ -11,7 +11,8 @@ jest.mock('fs', () => ({
   statSync: jest.fn(),
   promises: {
     access: jest.fn(),
-    readFile: jest.fn()
+    readFile: jest.fn(),
+    stat: jest.fn()
   }
 }));
 jest.mock('electron', () => ({
@@ -150,59 +151,57 @@ describe('Store', () => {
       jest.clearAllMocks();
     });
 
-    it('should ignore falsy and non-string inputs', () => {
-      store.setLastDirectory(null);
-      store.setLastDirectory(undefined);
-      store.setLastDirectory('');
-      store.setLastDirectory(123);
-      store.setLastDirectory({});
+    it('should ignore falsy and non-string inputs', async () => {
+      await store.setLastDirectory(null);
+      await store.setLastDirectory(undefined);
+      await store.setLastDirectory('');
+      await store.setLastDirectory(123);
+      await store.setLastDirectory({});
 
       expect(store.data.lastDirectory).toBeNull();
       expect(store.save).not.toHaveBeenCalled();
     });
 
-    it('should not update if the provided path does not exist', () => {
-      fs.existsSync.mockReturnValue(false);
+    it('should not update if the provided path does not exist', async () => {
+      const err = new Error('ENOENT');
+      err.code = 'ENOENT';
+      fs.promises.stat.mockRejectedValue(err);
 
-      store.setLastDirectory('/non/existent/path');
+      await store.setLastDirectory('/non/existent/path');
 
       expect(store.data.lastDirectory).toBeNull();
       expect(store.save).not.toHaveBeenCalled();
     });
 
-    it('should set lastDirectory to resolved path if it exists and is a directory', () => {
-      fs.existsSync.mockReturnValue(true);
-      fs.statSync.mockReturnValue({ isDirectory: () => true });
+    it('should set lastDirectory to resolved path if it exists and is a directory', async () => {
+      fs.promises.stat.mockResolvedValue({ isDirectory: () => true });
 
       // Assuming path.resolve just normalizes it in tests
       const testPath = path.resolve('/valid/dir');
-      store.setLastDirectory(testPath);
+      await store.setLastDirectory(testPath);
 
       expect(store.data.lastDirectory).toBe(testPath);
       expect(store.save).toHaveBeenCalled();
     });
 
-    it('should set lastDirectory to parent directory if path exists but is a file', () => {
-      fs.existsSync.mockReturnValue(true);
-      fs.statSync.mockReturnValue({ isDirectory: () => false });
+    it('should set lastDirectory to parent directory if path exists but is a file', async () => {
+      fs.promises.stat.mockResolvedValue({ isDirectory: () => false });
 
       const testPath = path.resolve('/valid/dir/file.txt');
       const expectedDir = path.dirname(testPath);
 
-      store.setLastDirectory(testPath);
+      await store.setLastDirectory(testPath);
 
       expect(store.data.lastDirectory).toBe(expectedDir);
       expect(store.save).toHaveBeenCalled();
     });
 
-    it('should gracefully handle exceptions and preserve original state', () => {
-      fs.existsSync.mockImplementation(() => {
-        throw new Error('Test filesystem error');
-      });
+    it('should gracefully handle exceptions and preserve original state', async () => {
+      fs.promises.stat.mockRejectedValue(new Error('Test filesystem error'));
 
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-      store.setLastDirectory('/error/path');
+      await store.setLastDirectory('/error/path');
 
       expect(store.data.lastDirectory).toBeNull(); // Should not have changed
       expect(store.save).not.toHaveBeenCalled();
