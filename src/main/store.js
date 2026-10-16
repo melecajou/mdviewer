@@ -76,17 +76,18 @@ class Store {
     this.save();
   }
 
-  setLastDirectory(dirPath) {
+  async setLastDirectory(dirPath) {
     if (!dirPath || typeof dirPath !== 'string') return;
     try {
       const resolved = path.resolve(dirPath);
-      if (fs.existsSync(resolved)) {
-        const isDir = fs.statSync(resolved).isDirectory();
-        this.data.lastDirectory = isDir ? resolved : path.dirname(resolved);
-        this.save();
-      }
+      const stats = await fs.promises.stat(resolved);
+      const isDir = stats.isDirectory();
+      this.data.lastDirectory = isDir ? resolved : path.dirname(resolved);
+      this.save();
     } catch (e) {
-      console.error('Error setting last directory:', e);
+      if (e.code !== 'ENOENT') {
+        console.error('Error setting last directory:', e);
+      }
     }
   }
 
