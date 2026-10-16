@@ -986,6 +986,7 @@ class MDViewerApp extends _MDViewerBase {
   // ---------------- Table of Contents (TOC) ----------------
 
   renderToc(headings) {
+    this.activeTocId = null;
     if (!headings || headings.length === 0) {
       this.tocContainer.innerHTML = '<p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-top: 20px;">Nenhum cabeçalho encontrado.</p>';
       return;
@@ -1020,14 +1021,36 @@ class MDViewerApp extends _MDViewerBase {
   updateActiveTocHeading() {
     if (!this.headings || this.headings.length === 0) return;
     const scrollPos = this.previewPane.scrollTop + 100;
-    
+
     let activeId = null;
-    for (let i = 0; i < this.headings.length; i++) {
-      const el = document.getElementById(this.headings[i].id);
-      if (el && el.offsetTop <= scrollPos) {
-        activeId = this.headings[i].id;
+    let low = 0;
+    let high = this.headings.length - 1;
+
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      const el = document.getElementById(this.headings[mid].id);
+      if (el) {
+        if (el.offsetTop <= scrollPos) {
+          activeId = this.headings[mid].id;
+          low = mid + 1;
+        } else {
+          high = mid - 1;
+        }
+      } else {
+        // Fallback to linear scan if DOM element is missing
+        activeId = null;
+        for (let i = 0; i < this.headings.length; i++) {
+          const hEl = document.getElementById(this.headings[i].id);
+          if (hEl && hEl.offsetTop <= scrollPos) {
+            activeId = this.headings[i].id;
+          }
+        }
+        break;
       }
     }
+
+    if (this.activeTocId === activeId) return;
+    this.activeTocId = activeId;
 
     const tocItems = this.tocContainer.querySelectorAll('.toc-item');
     tocItems.forEach(item => {
