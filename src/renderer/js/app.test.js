@@ -405,4 +405,51 @@ describe('MDViewerApp - bindEvents refactoring', () => {
       expect(app.closeFindBar).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('updateActiveTocHeading benchmark & correctness', () => {
+    beforeEach(() => {
+      const markdownContainer = document.getElementById('markdown-container');
+      markdownContainer.innerHTML = '';
+      app.headings = [];
+
+      // Create 2000 heading elements
+      const numHeadings = 2000;
+      for (let i = 0; i < numHeadings; i++) {
+        const id = `heading-${i}`;
+        app.headings.push({ id, text: `Heading ${i}`, level: 1 });
+
+        const headingEl = document.createElement('h1');
+        headingEl.id = id;
+        // Mock offsetTop
+        Object.defineProperty(headingEl, 'offsetTop', {
+          value: i * 50,
+          writable: true
+        });
+        markdownContainer.appendChild(headingEl);
+      }
+
+      app.renderToc(app.headings);
+      app.previewPane = document.getElementById('preview-pane');
+    });
+
+    it('should correctly activate the last heading before or at scroll position', () => {
+      app.previewPane.scrollTop = 500; // scrollPos = 600 -> heading 12 (offsetTop = 600)
+      app.updateActiveTocHeading();
+
+      const activeItem = app.tocContainer.querySelector('.toc-item.active');
+      expect(activeItem).not.toBeNull();
+      expect(activeItem.dataset.targetId).toBe('heading-12');
+    });
+
+    it('benchmark updateActiveTocHeading performance over 1000 scroll updates', () => {
+      const iterations = 1000;
+      const start = performance.now();
+      for (let i = 0; i < iterations; i++) {
+        app.previewPane.scrollTop = (i * 17) % 100000;
+        app.updateActiveTocHeading();
+      }
+      const duration = performance.now() - start;
+      console.log(`[Benchmark] updateActiveTocHeading duration for ${iterations} scroll calls: ${duration.toFixed(2)} ms`);
+    });
+  });
 });
