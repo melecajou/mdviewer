@@ -153,11 +153,32 @@ describe('parseMarkdown', () => {
     expect(result.html).toContain('class="anchor-link"');
   });
 
-  test('should render images', () => {
+  test('should escape attributes in markdown links and block javascript: URLs', () => {
+    const xssLink1 = parseMarkdown('[Click](javascript:alert(1) "title\\" onload=\\"alert(1)")');
+    expect(xssLink1.html).not.toContain('javascript:alert(1)');
+    expect(xssLink1.html).toContain('href="#"');
+    expect(xssLink1.html).toContain('title="title&quot; onload=&quot;alert(1)"');
+
+    const xssLink2 = parseMarkdown('[Click](https://example.com?a=1&b=2 "Hello <script>alert(1)</script>")');
+    expect(xssLink2.html).toContain('href="https://example.com?a=1&amp;b=2"');
+    expect(xssLink2.html).toContain('title="Hello &lt;script&gt;alert(1)&lt;/script&gt;"');
+
+    const xssLink3 = parseMarkdown('[Click](   javaSCRIPT:alert(1)  )');
+    expect(xssLink3.html).not.toContain('javaSCRIPT:alert(1)');
+    expect(xssLink3.html).toContain('href="#"');
+  });
+
+  test('should render images and escape attributes / block dangerous URLs', () => {
     const result = parseMarkdown('![Alt text](image.png "Title")');
     expect(result.html).toContain('<figure class="md-image-figure">');
     expect(result.html).toContain('<img src="image.png" alt="Alt text" title="Title"');
     expect(result.html).toContain('<figcaption class="md-image-caption">Alt text</figcaption>');
+
+    const xssImage = parseMarkdown('![Alt " onerror="alert(1)](javascript:alert(1) "Title\\" onerror=\\"alert(2)")');
+    expect(xssImage.html).not.toContain('javascript:alert(1)');
+    expect(xssImage.html).toContain('src="#"');
+    expect(xssImage.html).toContain('alt="Alt &quot; onerror=&quot;alert(1)"');
+    expect(xssImage.html).toContain('title="Title&quot; onerror=&quot;alert(2)"');
   });
 
   test('should render tables with wrapper', () => {
