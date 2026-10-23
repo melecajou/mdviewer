@@ -913,6 +913,91 @@ describe('MDViewerExtensionApp', () => {
       expect(app.explorerFolderName.textContent).toBe('MyFolder');
     });
 
+    describe('Directory Scanning Helpers', () => {
+      it('shouldIgnoreEntry should return true for hidden files and ignored directories', () => {
+        expect(app.shouldIgnoreEntry('.git')).toBe(true);
+        expect(app.shouldIgnoreEntry('.env')).toBe(true);
+        expect(app.shouldIgnoreEntry('node_modules')).toBe(true);
+        expect(app.shouldIgnoreEntry('__pycache__')).toBe(true);
+        expect(app.shouldIgnoreEntry('dist')).toBe(true);
+        expect(app.shouldIgnoreEntry('build')).toBe(true);
+        expect(app.shouldIgnoreEntry(null)).toBe(true);
+        expect(app.shouldIgnoreEntry('')).toBe(true);
+
+        expect(app.shouldIgnoreEntry('src')).toBe(false);
+        expect(app.shouldIgnoreEntry('docs')).toBe(false);
+        expect(app.shouldIgnoreEntry('README.md')).toBe(false);
+      });
+
+      it('isSupportedFile should validate supported file extensions', () => {
+        expect(app.isSupportedFile('doc.md')).toBe(true);
+        expect(app.isSupportedFile('doc.MARKDOWN')).toBe(true);
+        expect(app.isSupportedFile('doc.mdown')).toBe(true);
+        expect(app.isSupportedFile('notes.txt')).toBe(true);
+
+        expect(app.isSupportedFile('image.png')).toBe(false);
+        expect(app.isSupportedFile('script.js')).toBe(false);
+        expect(app.isSupportedFile(null)).toBe(false);
+        expect(app.isSupportedFile('')).toBe(false);
+      });
+
+      it('processDirectoryEntry should process file and directory entries correctly', async () => {
+        const fileEntry = { name: 'guide.md', kind: 'file' };
+        const resFile = await app.processDirectoryEntry(fileEntry, 'sub', 0);
+        expect(resFile).toEqual({
+          name: 'guide.md',
+          path: 'sub/guide.md',
+          relPath: 'sub/guide.md',
+          isDirectory: false,
+          isMarkdown: true,
+          handle: fileEntry
+        });
+
+        const ignoredEntry = { name: 'node_modules', kind: 'directory' };
+        const resIgnored = await app.processDirectoryEntry(ignoredEntry, '', 0);
+        expect(resIgnored).toBeNull();
+
+        const emptyDirEntry = {
+          name: 'empty',
+          kind: 'directory',
+          values: jest.fn().mockReturnValue([][Symbol.iterator]())
+        };
+        const resEmptyDir = await app.processDirectoryEntry(emptyDirEntry, '', 0);
+        expect(resEmptyDir).toBeNull();
+      });
+
+      it('scanDirectoryHandle should scan recursively, stop beyond depth 12, and sort entries', async () => {
+        const mockDeepDir = {
+          name: 'deep',
+          kind: 'directory',
+          values: jest.fn().mockReturnValue([][Symbol.iterator]())
+        };
+        const deepResult = await app.scanDirectoryHandle(mockDeepDir, '', 13);
+        expect(deepResult).toEqual([]);
+
+        const fileB = { name: 'b.md', kind: 'file' };
+        const fileA = { name: 'a.md', kind: 'file' };
+        const dirSub = {
+          name: 'subfolder',
+          kind: 'directory',
+          values: jest.fn().mockReturnValue([{ name: 'child.md', kind: 'file' }][Symbol.iterator]())
+        };
+
+        const mockRootDir = {
+          name: 'root',
+          kind: 'directory',
+          values: jest.fn().mockReturnValue([fileB, dirSub, fileA][Symbol.iterator]())
+        };
+
+        const tree = await app.scanDirectoryHandle(mockRootDir);
+        expect(tree.length).toBe(3);
+        expect(tree[0].name).toBe('subfolder');
+        expect(tree[0].isDirectory).toBe(true);
+        expect(tree[1].name).toBe('a.md');
+        expect(tree[2].name).toBe('b.md');
+      });
+    });
+
     it('should render file list in explorer correctly constructing folder tree', () => {
       const files = [
         { name: 'root.md', webkitRelativePath: 'MyProject/root.md' },
