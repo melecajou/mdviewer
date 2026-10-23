@@ -19,6 +19,32 @@ class MDViewerBase {
     return this.tabs.find(t => t.id === this.activeTabId);
   }
 
+  createSvg(options = {}) {
+    const {
+      viewBox = '0 0 16 16',
+      width = '14',
+      height = '14',
+      fill = 'currentColor',
+      pathD = '',
+      className = ''
+    } = options;
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    if (className) svg.setAttribute('class', className);
+    svg.setAttribute('viewBox', viewBox);
+    svg.setAttribute('width', String(width));
+    svg.setAttribute('height', String(height));
+    svg.setAttribute('fill', fill);
+
+    if (pathD) {
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', pathD);
+      svg.appendChild(path);
+    }
+
+    return svg;
+  }
+
   initMermaid() {
     if (window.mermaid) {
       const isDark = !document.documentElement.getAttribute('data-theme')?.includes('light');

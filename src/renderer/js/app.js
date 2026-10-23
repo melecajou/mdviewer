@@ -1214,18 +1214,6 @@ class MDViewerApp extends _MDViewerBase {
     const target = parentEl || this.fileTreeContainer;
     if (!parentEl) target.innerHTML = '';
 
-    const createSvg = (viewBox, width, height, fill, pathD) => {
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svg.setAttribute('viewBox', viewBox);
-      svg.setAttribute('width', width);
-      svg.setAttribute('height', height);
-      svg.setAttribute('fill', fill);
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', pathD);
-      svg.appendChild(path);
-      return svg;
-    };
-
     const ul = document.createElement('ul');
     ul.className = parentEl ? (defaultCollapsed ? 'tree-folder-children collapsed' : 'tree-folder-children') : 'file-tree';
 
@@ -1240,10 +1228,10 @@ class MDViewerApp extends _MDViewerBase {
 
         const arrowSpan = document.createElement('span');
         arrowSpan.className = `tree-arrow ${hasChildren ? '' : 'empty'}`;
-        const arrowSvg = createSvg('0 0 16 16', '10', '10', 'currentColor', 'M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z');
+        const arrowSvg = this.createSvg({ viewBox: '0 0 16 16', width: '10', height: '10', pathD: 'M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z' });
         arrowSpan.appendChild(arrowSvg);
 
-        const folderSvg = createSvg('0 0 16 16', '14', '14', '#58a6ff', 'M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z');
+        const folderSvg = this.createSvg({ viewBox: '0 0 16 16', fill: '#58a6ff', pathD: 'M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z' });
 
         const nameSpan = document.createElement('span');
         nameSpan.className = 'tree-item-name';
@@ -1278,8 +1266,8 @@ class MDViewerApp extends _MDViewerBase {
         arrowSpacer.className = 'tree-arrow-spacer';
 
         const fileSvg = isMd
-          ? createSvg('0 0 16 16', '14', '14', '#3fb950', 'M2 1.75C2 .784 2.784 0 3.75 0h6.586a1.75 1.75 0 0 1 1.237.513l2.914 2.914c.328.328.513.774.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.06v2.69c0 .138.112.25.25.25h2.69Z')
-          : createSvg('0 0 16 16', '14', '14', 'var(--text-muted)', 'M2 1.75C2 .784 2.784 0 3.75 0h8.5C13.216 0 14 .784 14 1.75v12.5A1.75 1.75 0 0 1 12.25 16h-8.5A1.75 1.75 0 0 1 2 14.25ZM3.75 1.5a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25Z');
+          ? this.createSvg({ viewBox: '0 0 16 16', fill: '#3fb950', pathD: 'M2 1.75C2 .784 2.784 0 3.75 0h6.586a1.75 1.75 0 0 1 1.237.513l2.914 2.914c.328.328.513.774.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.06v2.69c0 .138.112.25.25.25h2.69Z' })
+          : this.createSvg({ viewBox: '0 0 16 16', fill: 'var(--text-muted)', pathD: 'M2 1.75C2 .784 2.784 0 3.75 0h8.5C13.216 0 14 .784 14 1.75v12.5A1.75 1.75 0 0 1 12.25 16h-8.5A1.75 1.75 0 0 1 2 14.25ZM3.75 1.5a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25Z' });
 
         itemRow.className = 'tree-item tree-file';
         const nameSpan = document.createElement('span');
