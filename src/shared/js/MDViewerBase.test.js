@@ -19,6 +19,33 @@ describe('MDViewerBase', () => {
     jest.clearAllMocks();
   });
 
+  describe('createSvg', () => {
+    it('should create an svg element with correct namespace, attributes, and path child element', () => {
+      const svg = viewer.createSvg('0 0 16 16', '14', '14', '#58a6ff', 'M0 0h16v16H0z', 'custom-class');
+
+      expect(svg.namespaceURI).toBe('http://www.w3.org/2000/svg');
+      expect(svg.getAttribute('viewBox')).toBe('0 0 16 16');
+      expect(svg.getAttribute('width')).toBe('14');
+      expect(svg.getAttribute('height')).toBe('14');
+      expect(svg.getAttribute('fill')).toBe('#58a6ff');
+      expect(svg.getAttribute('class')).toBe('custom-class');
+
+      const path = svg.querySelector('path');
+      expect(path).not.toBeNull();
+      expect(path.namespaceURI).toBe('http://www.w3.org/2000/svg');
+      expect(path.getAttribute('d')).toBe('M0 0h16v16H0z');
+    });
+
+    it('should create an svg without class attribute if className is empty', () => {
+      const svg = viewer.createSvg('0 0 16 16', '10', '10', 'currentColor', 'M1 1l2 2');
+
+      expect(svg.hasAttribute('class')).toBe(false);
+      expect(svg.getAttribute('width')).toBe('10');
+      expect(svg.getAttribute('height')).toBe('10');
+      expect(svg.getAttribute('fill')).toBe('currentColor');
+    });
+  });
+
   describe('getActiveTab', () => {
     it('should return undefined when activeTabId is null or not found', () => {
       viewer.tabs = [{ id: 'tab1', title: 'Tab 1' }];
