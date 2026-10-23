@@ -1,6 +1,6 @@
 const hljs = require('highlight.js');
 const katex = require('katex');
-const { slugify, parseMarkdown, splitHighlightedLines, processMath, renderCache } = require('./markdown-engine');
+const { slugify, parseMarkdown, splitHighlightedLines, processMath, renderCache, escapeHtml } = require('./markdown-engine');
 
 describe('slugify', () => {
   test('should lowercase text', () => {
@@ -158,6 +158,20 @@ describe('parseMarkdown', () => {
     expect(result.html).toContain('<figure class="md-image-figure">');
     expect(result.html).toContain('<img src="image.png" alt="Alt text" title="Title"');
     expect(result.html).toContain('<figcaption class="md-image-caption">Alt text</figcaption>');
+  });
+
+  test('should escape HTML special characters in image title and alt text to prevent XSS', () => {
+    const result = parseMarkdown('![Alt "><script>alert(1)</script>](image.png "Title \\"><script>alert(2)</script>")');
+    expect(result.html).not.toContain('<script>');
+    expect(result.html).toContain('alt="Alt &amp;quot;&amp;gt;&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;"');
+    expect(result.html).toContain('title="Title &amp;quot;&amp;gt;&amp;lt;script&amp;gt;alert(2)&amp;lt;/script&amp;gt;"');
+    expect(result.html).toContain('<figcaption class="md-image-caption">Alt &amp;quot;&amp;gt;&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;</figcaption>');
+  });
+
+  test('should escape HTML special characters in link title', () => {
+    const result = parseMarkdown('[Link](https://example.com "Link \\"><script>alert(3)</script>")');
+    expect(result.html).not.toContain('<script>');
+    expect(result.html).toContain('title="Link &amp;quot;&amp;gt;&amp;lt;script&amp;gt;alert(3)&amp;lt;/script&amp;gt;"');
   });
 
   test('should render tables with wrapper', () => {
@@ -372,6 +386,18 @@ describe('processMath', () => {
     const result = restoreMath(htmlWithUnmatchedPlaceholder);
 
     expect(result).toBe('<div> and </div>');
+  });
+});
+
+describe('escapeHtml', () => {
+  test('should escape HTML special characters', () => {
+    expect(escapeHtml('foo & bar < baz > " qux \'')).toBe('foo &amp; bar &lt; baz &gt; &quot; qux &#39;');
+  });
+
+  test('should return empty string for falsy input', () => {
+    expect(escapeHtml('')).toBe('');
+    expect(escapeHtml(null)).toBe('');
+    expect(escapeHtml(undefined)).toBe('');
   });
 });
 

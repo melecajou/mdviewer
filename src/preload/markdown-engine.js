@@ -40,6 +40,16 @@ const ALERT_TITLES = {
   caution: 'Cuidado'
 };
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function slugify(text) {
   return text
     .toLowerCase()
@@ -357,7 +367,7 @@ function createCustomRenderer(headings) {
       text = textOrUndefined || '';
     }
 
-    const safeTitle = title ? ` title="${title}"` : '';
+    const safeTitle = title ? ` title="${escapeHtml(title)}"` : '';
     const isExternal = href && (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:'));
     const isAnchor = href && href.startsWith('#');
     
@@ -386,12 +396,13 @@ function createCustomRenderer(headings) {
       text = textOrUndefined || 'Imagem';
     }
 
-    const safeTitle = title ? ` title="${title}"` : '';
-    const altText = text || 'Imagem';
+    const safeTitle = title ? ` title="${escapeHtml(title)}"` : '';
+    const rawAlt = text || 'Imagem';
+    const safeAlt = escapeHtml(rawAlt);
     return `
       <figure class="md-image-figure">
-        <img src="${href}" alt="${altText}"${safeTitle} class="md-image" loading="lazy" />
-        ${altText && altText !== 'Imagem' ? `<figcaption class="md-image-caption">${altText}</figcaption>` : ''}
+        <img src="${href}" alt="${safeAlt}"${safeTitle} class="md-image" loading="lazy" />
+        ${rawAlt && rawAlt !== 'Imagem' ? `<figcaption class="md-image-caption">${safeAlt}</figcaption>` : ''}
       </figure>
     `;
   };
@@ -462,7 +473,8 @@ function parseMarkdown(rawContent) {
 const exportsObj = {
   parseMarkdown,
   slugify,
-  splitHighlightedLines
+  splitHighlightedLines,
+  escapeHtml
 };
 
 if (process.env.NODE_ENV === 'test') {
