@@ -1205,4 +1205,34 @@ describe('MDViewerBase', () => {
       });
     });
   });
+
+  describe('createSvg', () => {
+    it('should create an SVG element with attributes and path element', () => {
+      const viewBox = '0 0 16 16';
+      const width = '14';
+      const height = '14';
+      const fill = '#3fb950';
+      const pathD = 'M2 1.75C2 .784';
+      const className = 'file-icon';
+
+      const svg = viewer.createSvg(viewBox, width, height, fill, pathD, className);
+
+      expect(svg).toBeInstanceOf(SVGElement);
+      expect(svg.getAttribute('viewBox')).toBe(viewBox);
+      expect(svg.getAttribute('width')).toBe(width);
+      expect(svg.getAttribute('height')).toBe(height);
+      expect(svg.getAttribute('fill')).toBe(fill);
+      expect(svg.getAttribute('class')).toBe(className);
+
+      const path = svg.querySelector('path');
+      expect(path).not.toBeNull();
+      expect(path.getAttribute('d')).toBe(pathD);
+    });
+
+    it('should not set class attribute if className is empty', () => {
+      const svg = viewer.createSvg('0 0 16 16', '10', '10', 'currentColor', 'M6.22 3.22');
+
+      expect(svg.hasAttribute('class')).toBe(false);
+    });
+  });
 });
