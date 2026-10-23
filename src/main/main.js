@@ -89,6 +89,17 @@ function isSystemOrRootDirectory(p) {
 }
 
 
+function isIgnoredDir(entryName) {
+  if (!entryName || typeof entryName !== 'string') return true;
+  return (
+    entryName.startsWith('.') ||
+    entryName === 'node_modules' ||
+    entryName === '__pycache__' ||
+    entryName === 'target' ||
+    entryName === 'dist'
+  );
+}
+
 function isIgnoredArg(arg) {
   if (arg.startsWith('-')) return true;
   return (
@@ -545,7 +556,7 @@ ipcMain.handle('file:read-dir', async (event, dirPath) => {
       const entries = await fs.promises.readdir(dir, { withFileTypes: true });
 
       const promises = entries.map(async (entry) => {
-        if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === '__pycache__' || entry.name === 'target' || entry.name === 'dist') {
+        if (isIgnoredDir(entry.name)) {
           return null;
         }
         const fullPath = path.join(dir, entry.name);
@@ -805,6 +816,7 @@ if (process.env.NODE_ENV === 'test') {
     addAllowedPath,
     allowedPaths,
     isIgnoredArg,
+    isIgnoredDir,
     isPathAllowed,
     isSystemOrRootDirectory,
     normalizeCliArg,

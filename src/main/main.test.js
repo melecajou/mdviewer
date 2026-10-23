@@ -46,11 +46,12 @@ jest.mock('./file-watcher', () => {
 const fs = require('fs');
 const path = require('path');
 const { BrowserWindow, ipcMain, shell, nativeImage } = require('electron');
-const { normalizeCliArg, parseCommandLineArgs, addAllowedPath, allowedPaths, isIgnoredArg, isPathAllowed, isSystemOrRootDirectory, loadIconConfig, getIconConfigSync, _clearAllowedPaths, _resetCachedIconConfig } = require('./main');
+const { normalizeCliArg, parseCommandLineArgs, addAllowedPath, allowedPaths, isIgnoredArg, isIgnoredDir, isPathAllowed, isSystemOrRootDirectory, loadIconConfig, getIconConfigSync, _clearAllowedPaths, _resetCachedIconConfig } = require('./main');
 
 const ipcMainHandlers = new Map(ipcMain.handle.mock.calls);
 const openExternalHandler = ipcMainHandlers.get('shell:open-external');
 const allowDroppedPathHandler = ipcMainHandlers.get('app:allow-dropped-path');
+const readDirHandler = ipcMainHandlers.get('file:read-dir');
 
 describe('BrowserWindow webPreferences sandbox configuration', () => {
   it('should instantiate BrowserWindow with sandbox: true', () => {
@@ -385,6 +386,35 @@ describe('isPathAllowed', () => {
   });
 });
 
+describe('isIgnoredDir', () => {
+  it('should return true for hidden files and directories starting with .', () => {
+    expect(isIgnoredDir('.git')).toBe(true);
+    expect(isIgnoredDir('.vscode')).toBe(true);
+    expect(isIgnoredDir('.DS_Store')).toBe(true);
+  });
+
+  it('should return true for ignored directory names', () => {
+    expect(isIgnoredDir('node_modules')).toBe(true);
+    expect(isIgnoredDir('__pycache__')).toBe(true);
+    expect(isIgnoredDir('target')).toBe(true);
+    expect(isIgnoredDir('dist')).toBe(true);
+  });
+
+  it('should return false for standard directory and file names', () => {
+    expect(isIgnoredDir('src')).toBe(false);
+    expect(isIgnoredDir('docs')).toBe(false);
+    expect(isIgnoredDir('README.md')).toBe(false);
+    expect(isIgnoredDir('index.js')).toBe(false);
+  });
+
+  it('should return true for falsy or non-string inputs', () => {
+    expect(isIgnoredDir(null)).toBe(true);
+    expect(isIgnoredDir(undefined)).toBe(true);
+    expect(isIgnoredDir(123)).toBe(true);
+    expect(isIgnoredDir({})).toBe(true);
+  });
+});
+
 describe('isIgnoredArg', () => {
   it('should return true for flags starting with -', () => {
     expect(isIgnoredArg('-v')).toBe(true);
@@ -411,6 +441,58 @@ describe('isIgnoredArg', () => {
     expect(isIgnoredArg('relative/path/to/readme.markdown')).toBe(false);
     expect(isIgnoredArg('electron.js')).toBe(false);
     expect(isIgnoredArg('mdviewer.md')).toBe(false);
+  });
+});
+
+describe('file:read-dir IPC handler', () => {
+  beforeEach(() => {
+    _clearAllowedPaths();
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  it('should return error if dirPath is not allowed', async () => {
+    const result = await readDirHandler({}, '/unallowed/dir');
+    expect(result).toEqual({
+      success: false,
+      error: 'Access denied: Path is not allowed.'
+    });
+  });
+
+  it('should scan allowed directory and filter out ignored directories', async () => {
+    const dirPath = path.resolve('/allowed/project');
+    addAllowedPath(dirPath);
+
+    jest.spyOn(fs.promises, 'readdir').mockImplementation(async (targetDir) => {
+      if (targetDir === dirPath) {
+        return [
+          { name: '.git', isDirectory: () => true },
+          { name: 'node_modules', isDirectory: () => true },
+          { name: 'src', isDirectory: () => true },
+          { name: 'README.md', isDirectory: () => false }
+        ];
+      }
+      if (targetDir === path.join(dirPath, 'src')) {
+        return [
+          { name: 'main.js', isDirectory: () => false },
+          { name: 'target', isDirectory: () => true }
+        ];
+      }
+      return [];
+    });
+
+    const result = await readDirHandler({}, dirPath);
+    expect(result.success).toBe(true);
+    expect(result.dirPath).toBe(dirPath);
+
+    // .git and node_modules should be filtered out from top-level
+    const names = result.tree.map((item) => item.name);
+    expect(names).toEqual(['src', 'README.md']);
+
+    // target should be filtered out from src folder
+    const srcFolder = result.tree.find((item) => item.name === 'src');
+    expect(srcFolder).toBeDefined();
+    expect(srcFolder.children.map((child) => child.name)).toEqual(['main.js']);
   });
 });
 
