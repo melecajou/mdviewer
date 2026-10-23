@@ -19,6 +19,44 @@ describe('MDViewerBase', () => {
     jest.clearAllMocks();
   });
 
+  describe('createSvg', () => {
+    it('should create an SVG element with default attributes when no options are provided', () => {
+      const svg = viewer.createSvg();
+
+      expect(svg.namespaceURI).toBe('http://www.w3.org/2000/svg');
+      expect(svg.tagName.toLowerCase()).toBe('svg');
+      expect(svg.getAttribute('viewBox')).toBe('0 0 16 16');
+      expect(svg.getAttribute('width')).toBe('14');
+      expect(svg.getAttribute('height')).toBe('14');
+      expect(svg.getAttribute('fill')).toBe('currentColor');
+      expect(svg.getAttribute('class')).toBeNull();
+      expect(svg.children.length).toBe(0);
+    });
+
+    it('should create an SVG element with custom attributes, path, and class', () => {
+      const svg = viewer.createSvg({
+        viewBox: '0 0 24 24',
+        width: 20,
+        height: 20,
+        fill: '#123456',
+        pathD: 'M0 0h24v24H0z',
+        className: 'custom-icon'
+      });
+
+      expect(svg.getAttribute('viewBox')).toBe('0 0 24 24');
+      expect(svg.getAttribute('width')).toBe('20');
+      expect(svg.getAttribute('height')).toBe('20');
+      expect(svg.getAttribute('fill')).toBe('#123456');
+      expect(svg.getAttribute('class')).toBe('custom-icon');
+
+      expect(svg.children.length).toBe(1);
+      const path = svg.children[0];
+      expect(path.namespaceURI).toBe('http://www.w3.org/2000/svg');
+      expect(path.tagName.toLowerCase()).toBe('path');
+      expect(path.getAttribute('d')).toBe('M0 0h24v24H0z');
+    });
+  });
+
   describe('getActiveTab', () => {
     it('should return undefined when activeTabId is null or not found', () => {
       viewer.tabs = [{ id: 'tab1', title: 'Tab 1' }];
