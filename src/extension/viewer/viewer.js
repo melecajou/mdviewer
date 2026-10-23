@@ -1456,14 +1456,7 @@ class MDViewerExtensionApp extends MDViewerBase {
       return;
     }
 
-    const escapeHtml = (unsafe) => {
-      return (unsafe || '').toString()
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-    };
+    const escapeHtml = (unsafe) => MDViewerBase.escapeHtml(unsafe);
 
     this.tocContainer.innerHTML = headings.map(h => {
       const safeText = escapeHtml(h.text);
@@ -1668,14 +1661,7 @@ class MDViewerExtensionApp extends MDViewerBase {
     const contentHtml = this.markdownContainer.innerHTML;
     const rawTheme = document.documentElement.getAttribute('data-theme') || 'github-dark';
 
-    const escapeHtml = (unsafe) => {
-      return (unsafe || '').toString()
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-    };
+    const escapeHtml = (unsafe) => MDViewerBase.escapeHtml(unsafe);
 
     const safeTitle = escapeHtml(rawTitle);
     const safeTheme = escapeHtml(rawTheme);
