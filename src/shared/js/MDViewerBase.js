@@ -19,6 +19,19 @@ class MDViewerBase {
     return this.tabs.find(t => t.id === this.activeTabId);
   }
 
+  createSvg(viewBox, width, height, fill, pathD, className = '') {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    if (className) svg.setAttribute('class', className);
+    svg.setAttribute('viewBox', viewBox);
+    svg.setAttribute('width', width);
+    svg.setAttribute('height', height);
+    svg.setAttribute('fill', fill);
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', pathD);
+    svg.appendChild(path);
+    return svg;
+  }
+
   initMermaid() {
     if (window.mermaid) {
       const isDark = !document.documentElement.getAttribute('data-theme')?.includes('light');
