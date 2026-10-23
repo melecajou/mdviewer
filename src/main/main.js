@@ -596,7 +596,7 @@ ipcMain.handle('file:read', async (event, filePath) => {
     const resolvedPath = path.resolve(filePath);
     const content = await fs.promises.readFile(resolvedPath, 'utf-8');
     const stats = await fs.promises.stat(resolvedPath);
-    store.addRecentFile(resolvedPath);
+    await store.addRecentFile(resolvedPath);
     await store.setLastDirectory(path.dirname(resolvedPath));
     return {
       success: true,
@@ -631,7 +631,7 @@ ipcMain.handle('file:save', async (event, { filePath, content }) => {
     }
     await fs.promises.writeFile(resolvedPath, content, 'utf-8');
     const stats = await fs.promises.stat(resolvedPath);
-    store.addRecentFile(resolvedPath);
+    await store.addRecentFile(resolvedPath);
     return {
       success: true,
       filePath: resolvedPath,
@@ -671,7 +671,7 @@ ipcMain.handle('file:save-as', async (event, { content, defaultName, defaultDir 
       }
       await fs.promises.writeFile(resolvedPath, content, 'utf-8');
       const stats = await fs.promises.stat(resolvedPath);
-      store.addRecentFile(resolvedPath);
+      await store.addRecentFile(resolvedPath);
       await store.setLastDirectory(path.dirname(resolvedPath));
       return {
         success: true,
@@ -714,7 +714,7 @@ ipcMain.handle('file:read-dir', async (event, dirPath) => {
       return { success: false, error: 'Access denied: Path is not allowed.' };
     }
     const resolvedDir = path.resolve(dirPath);
-    store.addRecentFolder(resolvedDir);
+    await store.addRecentFolder(resolvedDir);
     store.set('lastOpenedFolder', resolvedDir);
     await store.setLastDirectory(resolvedDir);
 

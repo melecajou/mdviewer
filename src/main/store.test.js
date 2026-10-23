@@ -215,27 +215,27 @@ describe('Store', () => {
     let store;
 
     beforeEach(() => {
-      fs.existsSync.mockReturnValue(true);
+      fs.promises.stat.mockResolvedValue({ isDirectory: () => true });
       store = new Store();
       store.save = jest.fn();
       store.data.recentFiles = [];
     });
 
-    it('should do nothing if filePath is missing or not a string', () => {
-      store.addRecentFile();
-      store.addRecentFile(null);
-      store.addRecentFile(123);
-      store.addRecentFile({});
+    it('should do nothing if filePath is missing or not a string', async () => {
+      await store.addRecentFile();
+      await store.addRecentFile(null);
+      await store.addRecentFile(123);
+      await store.addRecentFile({});
 
       expect(store.data.recentFiles).toEqual([]);
       expect(store.save).not.toHaveBeenCalled();
     });
 
-    it('should add a new file to the beginning of recentFiles and call save()', () => {
+    it('should add a new file to the beginning of recentFiles and call save()', async () => {
       store.data.recentFiles = ['/existing/file.txt'];
       const newFile = '/new/file.md';
 
-      store.addRecentFile(newFile);
+      await store.addRecentFile(newFile);
 
       expect(store.data.recentFiles).toEqual([
         path.resolve(newFile),
@@ -244,11 +244,11 @@ describe('Store', () => {
       expect(store.save).toHaveBeenCalled();
     });
 
-    it('should move an existing file to the beginning of recentFiles', () => {
+    it('should move an existing file to the beginning of recentFiles', async () => {
       store.data.recentFiles = ['/file1.txt', '/file2.txt', '/file3.txt'];
       const fileToMove = '/file2.txt';
 
-      store.addRecentFile(fileToMove);
+      await store.addRecentFile(fileToMove);
 
       expect(store.data.recentFiles).toEqual([
         path.resolve(fileToMove),
@@ -258,33 +258,38 @@ describe('Store', () => {
       expect(store.save).toHaveBeenCalled();
     });
 
-    it('should truncate recentFiles to 20 items', () => {
+    it('should truncate recentFiles to 20 items', async () => {
       store.data.recentFiles = Array.from({ length: 20 }, (_, i) => `/file${i}.txt`);
       const newFile = '/new/file.md';
 
-      store.addRecentFile(newFile);
+      await store.addRecentFile(newFile);
 
       expect(store.data.recentFiles.length).toBe(20);
       expect(store.data.recentFiles[0]).toBe(path.resolve(newFile));
       expect(store.data.recentFiles[19]).toBe('/file18.txt');
     });
 
-    it('should set lastDirectory if the directory of the file exists', () => {
+    it('should set lastDirectory if the directory of the file exists', async () => {
       const newFile = '/path/to/existing/dir/file.md';
-      fs.existsSync.mockImplementation((p) => p === path.dirname(path.resolve(newFile)));
+      fs.promises.stat.mockImplementation(async (p) => {
+        if (p === path.dirname(path.resolve(newFile))) {
+          return { isDirectory: () => true };
+        }
+        throw new Error('ENOENT');
+      });
 
-      store.addRecentFile(newFile);
+      await store.addRecentFile(newFile);
 
       expect(store.data.lastDirectory).toBe(path.dirname(path.resolve(newFile)));
       expect(store.save).toHaveBeenCalled();
     });
 
-    it('should not set lastDirectory if the directory of the file does not exist', () => {
+    it('should not set lastDirectory if the directory of the file does not exist', async () => {
       const newFile = '/path/to/nonexistent/dir/file.md';
       store.data.lastDirectory = '/previous/last/dir';
-      fs.existsSync.mockReturnValue(false);
+      fs.promises.stat.mockRejectedValue(new Error('ENOENT'));
 
-      store.addRecentFile(newFile);
+      await store.addRecentFile(newFile);
 
       expect(store.data.lastDirectory).toBe('/previous/last/dir');
       expect(store.save).toHaveBeenCalled();
@@ -450,36 +455,37 @@ describe('Store', () => {
     let store;
 
     beforeEach(() => {
+      fs.promises.stat.mockResolvedValue({ isDirectory: () => true });
       store = new Store();
       store.save = jest.fn(); // Mock save to prevent file writes
       jest.clearAllMocks();
     });
 
-    it('should do nothing if folderPath is missing or invalid type', () => {
-      store.addRecentFolder(null);
-      store.addRecentFolder(undefined);
-      store.addRecentFolder(123);
-      store.addRecentFolder({});
+    it('should do nothing if folderPath is missing or invalid type', async () => {
+      await store.addRecentFolder(null);
+      await store.addRecentFolder(undefined);
+      await store.addRecentFolder(123);
+      await store.addRecentFolder({});
 
       expect(store.data.recentFolders).toEqual([]);
       expect(store.save).not.toHaveBeenCalled();
     });
 
-    it('should add a new folder to the beginning of recentFolders and call save', () => {
-      store.addRecentFolder('/some/new/folder');
+    it('should add a new folder to the beginning of recentFolders and call save', async () => {
+      await store.addRecentFolder('/some/new/folder');
 
       expect(store.data.recentFolders).toEqual([path.resolve('/some/new/folder')]);
       expect(store.save).toHaveBeenCalledTimes(1);
     });
 
-    it('should remove existing occurrence of the folder and move it to the front', () => {
+    it('should remove existing occurrence of the folder and move it to the front', async () => {
       store.data.recentFolders = [
         path.resolve('/folder/1'),
         path.resolve('/folder/2'),
         path.resolve('/folder/3')
       ];
 
-      store.addRecentFolder('/folder/2');
+      await store.addRecentFolder('/folder/2');
 
       expect(store.data.recentFolders).toEqual([
         path.resolve('/folder/2'),
@@ -489,12 +495,12 @@ describe('Store', () => {
       expect(store.save).toHaveBeenCalledTimes(1);
     });
 
-    it('should truncate recentFolders to 10 items if limit is exceeded', () => {
+    it('should truncate recentFolders to 10 items if limit is exceeded', async () => {
       // Add 10 dummy folders
       const dummyFolders = Array.from({ length: 10 }, (_, i) => path.resolve(`/folder/${i}`));
       store.data.recentFolders = [...dummyFolders];
 
-      store.addRecentFolder('/new/folder');
+      await store.addRecentFolder('/new/folder');
 
       expect(store.data.recentFolders.length).toBe(10);
       expect(store.data.recentFolders[0]).toBe(path.resolve('/new/folder'));
@@ -502,19 +508,24 @@ describe('Store', () => {
       expect(store.data.recentFolders[9]).toBe(dummyFolders[8]);
     });
 
-    it('should set lastDirectory if the folder exists on disk', () => {
-      fs.existsSync.mockImplementation((p) => p === path.resolve('/existing/folder'));
+    it('should set lastDirectory if the folder exists on disk', async () => {
+      fs.promises.stat.mockImplementation(async (p) => {
+        if (p === path.resolve('/existing/folder')) {
+          return { isDirectory: () => true };
+        }
+        throw new Error('ENOENT');
+      });
 
-      store.addRecentFolder('/existing/folder');
+      await store.addRecentFolder('/existing/folder');
 
       expect(store.data.lastDirectory).toBe(path.resolve('/existing/folder'));
     });
 
-    it('should not set lastDirectory if the folder does not exist on disk', () => {
-      fs.existsSync.mockReturnValue(false);
+    it('should not set lastDirectory if the folder does not exist on disk', async () => {
+      fs.promises.stat.mockRejectedValue(new Error('ENOENT'));
       store.data.lastDirectory = '/previous/dir';
 
-      store.addRecentFolder('/nonexistent/folder');
+      await store.addRecentFolder('/nonexistent/folder');
 
       expect(store.data.lastDirectory).toBe('/previous/dir');
     });

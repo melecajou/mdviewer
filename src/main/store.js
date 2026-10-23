@@ -158,7 +158,7 @@ class Store {
     return undefined;
   }
 
-  addRecentFile(filePath) {
+  async addRecentFile(filePath) {
     if (!filePath || typeof filePath !== 'string') return;
     const norm = path.resolve(filePath);
     let recents = (this.data.recentFiles || []).filter(p => p !== norm);
@@ -168,13 +168,16 @@ class Store {
     }
     this.data.recentFiles = recents;
     const dir = path.dirname(norm);
-    if (fs.existsSync(dir)) {
-      this.data.lastDirectory = dir;
-    }
+    try {
+      const stats = await fs.promises.stat(dir);
+      if (stats.isDirectory()) {
+        this.data.lastDirectory = dir;
+      }
+    } catch {}
     this.save();
   }
 
-  addRecentFolder(folderPath) {
+  async addRecentFolder(folderPath) {
     if (!folderPath || typeof folderPath !== 'string') return;
     const norm = path.resolve(folderPath);
     let recents = (this.data.recentFolders || []).filter(p => p !== norm);
@@ -183,9 +186,12 @@ class Store {
       recents = recents.slice(0, 10);
     }
     this.data.recentFolders = recents;
-    if (fs.existsSync(norm)) {
-      this.data.lastDirectory = norm;
-    }
+    try {
+      const stats = await fs.promises.stat(norm);
+      if (stats.isDirectory()) {
+        this.data.lastDirectory = norm;
+      }
+    } catch {}
     this.save();
   }
 
