@@ -1,4 +1,17 @@
 class MDViewerBase {
+  static escapeHtml(unsafe) {
+    return (unsafe || '').toString()
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  escapeHtml(unsafe) {
+    return MDViewerBase.escapeHtml(unsafe);
+  }
+
   constructor() {
     this.tabs = [];
     this.activeTabId = null;

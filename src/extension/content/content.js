@@ -49,14 +49,7 @@
     document.body.innerHTML = '';
   }
 
-  function escapeHtml(unsafe) {
-    return (unsafe || '').toString()
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
+  const escapeHtml = (unsafe) => MDViewerBase.escapeHtml(unsafe);
 
   // Nome do arquivo
   const filename = decodeURIComponent(window.location.pathname.split('/').pop()) || 'documento.md';

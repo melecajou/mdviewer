@@ -1478,17 +1478,8 @@ class MDViewerExtensionApp extends MDViewerBase {
       return;
     }
 
-    const escapeHtml = (unsafe) => {
-      return (unsafe || '').toString()
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-    };
-
     this.tocContainer.innerHTML = headings.map(h => {
-      const safeText = escapeHtml(h.text);
+      const safeText = this.escapeHtml(h.text);
       return `
       <div class="toc-item level-${Math.min(h.level, 4)}" data-id="${h.id}" title="${safeText}">
         <span class="toc-text">${safeText}</span>
@@ -1690,17 +1681,8 @@ class MDViewerExtensionApp extends MDViewerBase {
     const contentHtml = this.markdownContainer.innerHTML;
     const rawTheme = document.documentElement.getAttribute('data-theme') || 'github-dark';
 
-    const escapeHtml = (unsafe) => {
-      return (unsafe || '').toString()
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-    };
-
-    const safeTitle = escapeHtml(rawTitle);
-    const safeTheme = escapeHtml(rawTheme);
+    const safeTitle = this.escapeHtml(rawTitle);
+    const safeTheme = this.escapeHtml(rawTheme);
 
     const purify = typeof DOMPurify !== 'undefined' ? DOMPurify : null;
     const sanitizedContent = purify && typeof purify.sanitize === 'function'
