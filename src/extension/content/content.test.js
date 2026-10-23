@@ -4,6 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const MDViewerBase = require('../../shared/js/MDViewerBase');
 
 describe('Content script (content.js) - Security & Sanitization', () => {
   let contentJsCode;
@@ -20,6 +21,8 @@ describe('Content script (content.js) - Security & Sanitization', () => {
     delete window.MDViewerEngine;
     delete window.DOMPurify;
     delete window.chrome;
+
+    window.MDViewerBase = MDViewerBase;
 
     // Mock chrome API
     window.chrome = {

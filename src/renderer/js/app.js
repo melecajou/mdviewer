@@ -1626,19 +1626,10 @@ class MDViewerApp extends _MDViewerBase {
     const preferredDir = activeTab.dirName || this.currentFolder;
     const parsed = window.electronAPI.parseMarkdown(activeTab.content);
 
-    const escapeHtml = (unsafe) => {
-      return (unsafe || '').toString()
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-    };
-
     // Get current theme styles
     const rawTheme = document.documentElement.getAttribute('data-theme') || 'github-dark';
-    const safeTheme = escapeHtml(rawTheme);
-    const safeFileName = escapeHtml(activeTab.fileName);
+    const safeTheme = this.escapeHtml(rawTheme);
+    const safeFileName = this.escapeHtml(activeTab.fileName);
 
     const purify = typeof DOMPurify !== 'undefined' ? DOMPurify : null;
     const sanitizedHtml = purify && typeof purify.sanitize === 'function'

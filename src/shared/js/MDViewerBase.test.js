@@ -19,6 +19,22 @@ describe('MDViewerBase', () => {
     jest.clearAllMocks();
   });
 
+  describe('escapeHtml', () => {
+    it('should escape special HTML characters statically and on instance', () => {
+      const raw = '<script>alert("XSS & \'test\'");</script>';
+      const expected = '&lt;script&gt;alert(&quot;XSS &amp; &#039;test&#039;&quot;);&lt;/script&gt;';
+
+      expect(MDViewerBase.escapeHtml(raw)).toBe(expected);
+      expect(viewer.escapeHtml(raw)).toBe(expected);
+    });
+
+    it('should handle null, undefined, and non-string values safely', () => {
+      expect(MDViewerBase.escapeHtml(null)).toBe('');
+      expect(MDViewerBase.escapeHtml(undefined)).toBe('');
+      expect(MDViewerBase.escapeHtml(123)).toBe('123');
+    });
+  });
+
   describe('getActiveTab', () => {
     it('should return undefined when activeTabId is null or not found', () => {
       viewer.tabs = [{ id: 'tab1', title: 'Tab 1' }];
