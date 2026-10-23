@@ -115,7 +115,7 @@ function normalizeCliArg(arg) {
   }
 }
 
-function resolveCliTarget(arg, cwd, appPath, mainScriptPath) {
+function resolveCliTarget(arg, cwd, appPath, mainScriptPath, existsCache = null) {
   if (!arg || typeof arg !== 'string') return null;
   if (isIgnoredArg(arg)) return null;
 
@@ -130,7 +130,17 @@ function resolveCliTarget(arg, cwd, appPath, mainScriptPath) {
       return null;
     }
 
-    if (fs.existsSync(resolved)) {
+    let exists = false;
+    if (existsCache && existsCache.has(resolved)) {
+      exists = existsCache.get(resolved);
+    } else {
+      exists = fs.existsSync(resolved);
+      if (existsCache) {
+        existsCache.set(resolved, exists);
+      }
+    }
+
+    if (exists) {
       return resolved;
     }
   } catch (e) {
@@ -147,9 +157,10 @@ function parseCommandLineArgs(argv, cwd = process.cwd()) {
   const appPath = path.resolve(__dirname, '../..');
   const mainScriptPath = path.resolve(__dirname, 'main.js');
 
+  const existsCache = new Map();
   const targets = [];
   for (let i = 0; i < argv.length; i++) {
-    const target = resolveCliTarget(argv[i], cwd, appPath, mainScriptPath);
+    const target = resolveCliTarget(argv[i], cwd, appPath, mainScriptPath, existsCache);
     if (target) {
       targets.push(target);
       addAllowedPath(target);
