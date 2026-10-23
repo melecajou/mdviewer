@@ -19,6 +19,31 @@ describe('MDViewerBase', () => {
     jest.clearAllMocks();
   });
 
+  describe('createSvg', () => {
+    it('should create an svg element with correct attributes and child path element', () => {
+      const svg = viewer.createSvg('0 0 16 16', '14', '14', '#58a6ff', 'M1 1L15 15');
+
+      expect(svg.namespaceURI).toBe('http://www.w3.org/2000/svg');
+      expect(svg.tagName.toLowerCase()).toBe('svg');
+      expect(svg.getAttribute('viewBox')).toBe('0 0 16 16');
+      expect(svg.getAttribute('width')).toBe('14');
+      expect(svg.getAttribute('height')).toBe('14');
+      expect(svg.getAttribute('fill')).toBe('#58a6ff');
+      expect(svg.hasAttribute('class')).toBe(false);
+
+      const path = svg.querySelector('path');
+      expect(path).not.toBeNull();
+      expect(path.namespaceURI).toBe('http://www.w3.org/2000/svg');
+      expect(path.getAttribute('d')).toBe('M1 1L15 15');
+    });
+
+    it('should set className attribute on svg element if provided', () => {
+      const svg = viewer.createSvg('0 0 16 16', '10', '10', 'currentColor', 'M0 0', 'icon-class');
+
+      expect(svg.getAttribute('class')).toBe('icon-class');
+    });
+  });
+
   describe('getActiveTab', () => {
     it('should return undefined when activeTabId is null or not found', () => {
       viewer.tabs = [{ id: 'tab1', title: 'Tab 1' }];
