@@ -150,65 +150,63 @@ function splitHighlightedLines(html) {
   return result;
 }
 
-function createCustomRenderer(headings) {
-  const slugCounts = {};
-  const renderer = new marked.Renderer();
+// Helper functions for individual marked custom renderer methods
 
-  // Custom heading renderer with slug & outline extraction
-  renderer.heading = function (textOrObj, levelOrUndefined, rawOrUndefined) {
-    let renderedText = '';
-    let depth = 1;
-    let rawText = '';
+function renderHeading(rendererContext, slugCounts, headings, textOrObj, levelOrUndefined, rawOrUndefined) {
+  let renderedText = '';
+  let depth = 1;
+  let rawText = '';
 
-    if (typeof textOrObj === 'object' && textOrObj !== null) {
-      depth = textOrObj.depth || 1;
-      renderedText = (this.parser && textOrObj.tokens) ? this.parser.parseInline(textOrObj.tokens) : (textOrObj.text || '');
-      rawText = renderedText.replace(/<[^>]+>/g, '').trim();
-    } else {
-      renderedText = String(textOrObj || '');
-      depth = levelOrUndefined || 1;
-      rawText = (rawOrUndefined || renderedText).replace(/<[^>]+>/g, '').trim();
-    }
+  if (typeof textOrObj === 'object' && textOrObj !== null) {
+    depth = textOrObj.depth || 1;
+    renderedText = (rendererContext && rendererContext.parser && textOrObj.tokens)
+      ? rendererContext.parser.parseInline(textOrObj.tokens)
+      : (textOrObj.text || '');
+    rawText = renderedText.replace(/<[^>]+>/g, '').trim();
+  } else {
+    renderedText = String(textOrObj || '');
+    depth = levelOrUndefined || 1;
+    rawText = (rawOrUndefined || renderedText).replace(/<[^>]+>/g, '').trim();
+  }
 
-    let baseSlug = slugify(rawText) || `heading-${depth}`;
-    
-    if (slugCounts[baseSlug] !== undefined) {
-      slugCounts[baseSlug]++;
-      baseSlug = `${baseSlug}-${slugCounts[baseSlug]}`;
-    } else {
-      slugCounts[baseSlug] = 0;
-    }
+  let baseSlug = slugify(rawText) || `heading-${depth}`;
 
-    headings.push({
-      level: depth,
-      text: rawText,
-      id: baseSlug
-    });
+  if (slugCounts[baseSlug] !== undefined) {
+    slugCounts[baseSlug]++;
+    baseSlug = `${baseSlug}-${slugCounts[baseSlug]}`;
+  } else {
+    slugCounts[baseSlug] = 0;
+  }
 
-    return `
+  headings.push({
+    level: depth,
+    text: rawText,
+    id: baseSlug
+  });
+
+  return `
       <h${depth} id="${baseSlug}" class="md-heading md-h${depth}">
         <span class="heading-anchor" title="Copiar link da seção">#</span>
         <span class="heading-text">${renderedText}</span>
       </h${depth}>
     `;
-  };
+}
 
-  // Custom code block renderer with highlight.js & Mermaid support
-  renderer.code = function (codeOrObj, infostringOrUndefined) {
-    let code = '';
-    let lang = '';
-    if (typeof codeOrObj === 'object' && codeOrObj !== null) {
-      code = codeOrObj.text || '';
-      lang = codeOrObj.lang || '';
-    } else {
-      code = codeOrObj || '';
-      lang = infostringOrUndefined || '';
-    }
-    const cleanLang = (lang || '').trim().toLowerCase();
+function renderCode(codeOrObj, infostringOrUndefined) {
+  let code = '';
+  let lang = '';
+  if (typeof codeOrObj === 'object' && codeOrObj !== null) {
+    code = codeOrObj.text || '';
+    lang = codeOrObj.lang || '';
+  } else {
+    code = codeOrObj || '';
+    lang = infostringOrUndefined || '';
+  }
+  const cleanLang = (lang || '').trim().toLowerCase();
 
-    // Check for Mermaid diagram
-    if (cleanLang === 'mermaid') {
-      return `
+  // Check for Mermaid diagram
+  if (cleanLang === 'mermaid') {
+    return `
         <div class="mermaid-block-wrapper">
           <div class="mermaid-header">
             <span class="mermaid-badge">
@@ -219,41 +217,41 @@ function createCustomRenderer(headings) {
           <div class="mermaid">${code}</div>
         </div>
       `;
+  }
+
+  let highlighted = '';
+  let languageLabel = cleanLang || 'texto';
+
+  if (cleanLang && hljs.getLanguage(cleanLang)) {
+    try {
+      highlighted = hljs.highlight(code, { language: cleanLang, ignoreIllegals: true }).value;
+    } catch {
+      highlighted = hljs.highlightAuto(code).value;
     }
-
-    let highlighted = '';
-    let languageLabel = cleanLang || 'texto';
-
-    if (cleanLang && hljs.getLanguage(cleanLang)) {
-      try {
-        highlighted = hljs.highlight(code, { language: cleanLang, ignoreIllegals: true }).value;
-      } catch {
-        highlighted = hljs.highlightAuto(code).value;
+  } else if (code.trim()) {
+    try {
+      const auto = hljs.highlightAuto(code);
+      highlighted = auto.value;
+      if (auto.language) {
+        languageLabel = auto.language;
       }
-    } else if (code.trim()) {
-      try {
-        const auto = hljs.highlightAuto(code);
-        highlighted = auto.value;
-        if (auto.language) {
-          languageLabel = auto.language;
-        }
-      } catch {
-        highlighted = code
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;');
-      }
-    } else {
-      highlighted = '';
+    } catch {
+      highlighted = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
     }
+  } else {
+    highlighted = '';
+  }
 
-    // Add line numbers safely preserving syntax spans across lines without extra whitespace
-    const lines = splitHighlightedLines(highlighted);
-    const numberedLines = lines.map((line, idx) => `<div class="code-line"><span class="line-number" data-line="${idx + 1}"></span><span class="line-content">${line}</span></div>`).join('');
+  // Add line numbers safely preserving syntax spans across lines without extra whitespace
+  const lines = splitHighlightedLines(highlighted);
+  const numberedLines = lines.map((line, idx) => `<div class="code-line"><span class="line-number" data-line="${idx + 1}"></span><span class="line-content">${line}</span></div>`).join('');
 
-    const escapedRawCode = encodeURIComponent(code);
+  const escapedRawCode = encodeURIComponent(code);
 
-    return `
+  return `
       <div class="code-block-wrapper">
         <div class="code-block-header">
           <span class="code-lang-badge">${languageLabel}</span>
@@ -268,24 +266,25 @@ function createCustomRenderer(headings) {
         <pre class="hljs-pre"><code class="hljs ${cleanLang ? `language-${cleanLang}` : ''}">${numberedLines}</code></pre>
       </div>
     `;
-  };
+}
 
-  // Custom blockquote renderer with GitHub Callouts / Alerts support
-  renderer.blockquote = function (quoteOrObj) {
-    let body = '';
-    if (typeof quoteOrObj === 'object' && quoteOrObj !== null) {
-      body = (this.parser && quoteOrObj.tokens) ? this.parser.parse(quoteOrObj.tokens) : (quoteOrObj.text || '');
-    } else {
-      body = quoteOrObj || '';
-    }
-    const alertMatch = body.match(/^\s*<p>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*(?:<br>|\n)?([\s\S]*?)<\/p>/i);
-    if (alertMatch) {
-      const alertType = alertMatch[1].toLowerCase();
-      const remainingContent = alertMatch[2] || '';
-      const icon = ALERT_ICONS[alertType] || ALERT_ICONS.note;
-      const title = ALERT_TITLES[alertType] || 'Nota';
+function renderBlockquote(rendererContext, quoteOrObj) {
+  let body = '';
+  if (typeof quoteOrObj === 'object' && quoteOrObj !== null) {
+    body = (rendererContext && rendererContext.parser && quoteOrObj.tokens)
+      ? rendererContext.parser.parse(quoteOrObj.tokens)
+      : (quoteOrObj.text || '');
+  } else {
+    body = quoteOrObj || '';
+  }
+  const alertMatch = body.match(/^\s*<p>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*(?:<br>|\n)?([\s\S]*?)<\/p>/i);
+  if (alertMatch) {
+    const alertType = alertMatch[1].toLowerCase();
+    const remainingContent = alertMatch[2] || '';
+    const icon = ALERT_ICONS[alertType] || ALERT_ICONS.note;
+    const title = ALERT_TITLES[alertType] || 'Nota';
 
-      return `
+    return `
         <div class="markdown-alert markdown-alert-${alertType}">
           <div class="markdown-alert-header">
             <span class="markdown-alert-icon">${icon}</span>
@@ -296,39 +295,39 @@ function createCustomRenderer(headings) {
           </div>
         </div>
       `;
-    }
-    return `<blockquote>${body}</blockquote>`;
-  };
+  }
+  return `<blockquote>${body}</blockquote>`;
+}
 
-  // Custom table renderer wrapped in responsive container
-  renderer.table = function (headerOrObj, bodyOrUndefined) {
-    let html = '';
-    if (typeof headerOrObj === 'object' && headerOrObj !== null && bodyOrUndefined === undefined) {
-      html = marked.Renderer.prototype.table.call(this, headerOrObj);
-    } else {
-      html = marked.Renderer.prototype.table.call(this, headerOrObj, bodyOrUndefined);
-    }
-    return `<div class="table-responsive">${html}</div>`;
-  };
+function renderTable(rendererContext, headerOrObj, bodyOrUndefined) {
+  let html = '';
+  if (typeof headerOrObj === 'object' && headerOrObj !== null && bodyOrUndefined === undefined) {
+    html = marked.Renderer.prototype.table.call(rendererContext, headerOrObj);
+  } else {
+    html = marked.Renderer.prototype.table.call(rendererContext, headerOrObj, bodyOrUndefined);
+  }
+  return `<div class="table-responsive">${html}</div>`;
+}
 
-  // Custom listitem renderer
-  renderer.listitem = function (textOrObj, taskOrUndefined, checkedOrUndefined) {
-    let content = '';
-    let isTask = false;
-    let isChecked = false;
+function renderListitem(rendererContext, textOrObj, taskOrUndefined, checkedOrUndefined) {
+  let content = '';
+  let isTask = false;
+  let isChecked = false;
 
-    if (typeof textOrObj === 'object' && textOrObj !== null) {
-      content = (this.parser && textOrObj.tokens) ? this.parser.parse(textOrObj.tokens) : (textOrObj.text || '');
-      isTask = !!textOrObj.task;
-      isChecked = !!textOrObj.checked;
-    } else {
-      content = textOrObj || '';
-      isTask = !!taskOrUndefined;
-      isChecked = !!checkedOrUndefined;
-    }
+  if (typeof textOrObj === 'object' && textOrObj !== null) {
+    content = (rendererContext && rendererContext.parser && textOrObj.tokens)
+      ? rendererContext.parser.parse(textOrObj.tokens)
+      : (textOrObj.text || '');
+    isTask = !!textOrObj.task;
+    isChecked = !!textOrObj.checked;
+  } else {
+    content = textOrObj || '';
+    isTask = !!taskOrUndefined;
+    isChecked = !!checkedOrUndefined;
+  }
 
-    if (isTask) {
-      return `
+  if (isTask) {
+    return `
         <li class="task-list-item ${isChecked ? 'task-checked' : 'task-unchecked'}">
           <label class="task-label">
             <input type="checkbox" class="task-checkbox" ${isChecked ? 'checked' : ''} disabled />
@@ -337,63 +336,97 @@ function createCustomRenderer(headings) {
           </label>
         </li>
       `;
-    }
-    return `<li>${content}</li>`;
-  };
+  }
+  return `<li>${content}</li>`;
+}
 
-  // Custom link renderer (handles local .md files vs external URLs)
-  renderer.link = function (hrefOrObj, titleOrUndefined, textOrUndefined) {
-    let href = '';
-    let title = '';
-    let text = '';
+function renderLink(rendererContext, hrefOrObj, titleOrUndefined, textOrUndefined) {
+  let href = '';
+  let title = '';
+  let text = '';
 
-    if (typeof hrefOrObj === 'object' && hrefOrObj !== null) {
-      href = hrefOrObj.href || '';
-      title = hrefOrObj.title || '';
-      text = (this.parser && hrefOrObj.tokens) ? this.parser.parseInline(hrefOrObj.tokens) : (hrefOrObj.text || '');
-    } else {
-      href = hrefOrObj || '';
-      title = titleOrUndefined || '';
-      text = textOrUndefined || '';
-    }
+  if (typeof hrefOrObj === 'object' && hrefOrObj !== null) {
+    href = hrefOrObj.href || '';
+    title = hrefOrObj.title || '';
+    text = (rendererContext && rendererContext.parser && hrefOrObj.tokens)
+      ? rendererContext.parser.parseInline(hrefOrObj.tokens)
+      : (hrefOrObj.text || '');
+  } else {
+    href = hrefOrObj || '';
+    title = titleOrUndefined || '';
+    text = textOrUndefined || '';
+  }
 
-    const safeTitle = title ? ` title="${title}"` : '';
-    const isExternal = href && (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:'));
-    const isAnchor = href && href.startsWith('#');
-    
-    if (isExternal) {
-      return `<a href="${href}"${safeTitle} class="external-link" target="_blank" rel="noopener noreferrer">${text}<svg class="external-icon" viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.5.75a.75.75 0 0 1 .75-.75h4.25c.414 0 .75.336.75.75v4.25a.75.75 0 0 1-1.5 0V3.56L9.53 8.53a.75.75 0 0 1-1.06-1.06L13.44 2.5H11a.75.75 0 0 1-.75-.75Z"/></svg></a>`;
-    } else if (isAnchor) {
-      return `<a href="${href}"${safeTitle} class="anchor-link">${text}</a>`;
-    } else {
-      return `<a href="${href}"${safeTitle} class="internal-link" data-local-path="${href}">${text}</a>`;
-    }
-  };
+  const safeTitle = title ? ` title="${title}"` : '';
+  const isExternal = href && (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:'));
+  const isAnchor = href && href.startsWith('#');
 
-  // Custom image renderer with lightbox data attribute
-  renderer.image = function (hrefOrObj, titleOrUndefined, textOrUndefined) {
-    let href = '';
-    let title = '';
-    let text = '';
+  if (isExternal) {
+    return `<a href="${href}"${safeTitle} class="external-link" target="_blank" rel="noopener noreferrer">${text}<svg class="external-icon" viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.5.75a.75.75 0 0 1 .75-.75h4.25c.414 0 .75.336.75.75v4.25a.75.75 0 0 1-1.5 0V3.56L9.53 8.53a.75.75 0 0 1-1.06-1.06L13.44 2.5H11a.75.75 0 0 1-.75-.75Z"/></svg></a>`;
+  } else if (isAnchor) {
+    return `<a href="${href}"${safeTitle} class="anchor-link">${text}</a>`;
+  } else {
+    return `<a href="${href}"${safeTitle} class="internal-link" data-local-path="${href}">${text}</a>`;
+  }
+}
 
-    if (typeof hrefOrObj === 'object' && hrefOrObj !== null) {
-      href = hrefOrObj.href || '';
-      title = hrefOrObj.title || '';
-      text = (hrefOrObj.tokens && this.parser) ? this.parser.parseInline(hrefOrObj.tokens, this.parser.textRenderer) : (hrefOrObj.text || 'Imagem');
-    } else {
-      href = hrefOrObj || '';
-      title = titleOrUndefined || '';
-      text = textOrUndefined || 'Imagem';
-    }
+function renderImage(rendererContext, hrefOrObj, titleOrUndefined, textOrUndefined) {
+  let href = '';
+  let title = '';
+  let text = '';
 
-    const safeTitle = title ? ` title="${title}"` : '';
-    const altText = text || 'Imagem';
-    return `
+  if (typeof hrefOrObj === 'object' && hrefOrObj !== null) {
+    href = hrefOrObj.href || '';
+    title = hrefOrObj.title || '';
+    text = (hrefOrObj.tokens && rendererContext && rendererContext.parser)
+      ? rendererContext.parser.parseInline(hrefOrObj.tokens, rendererContext.parser.textRenderer)
+      : (hrefOrObj.text || 'Imagem');
+  } else {
+    href = hrefOrObj || '';
+    title = titleOrUndefined || '';
+    text = textOrUndefined || 'Imagem';
+  }
+
+  const safeTitle = title ? ` title="${title}"` : '';
+  const altText = text || 'Imagem';
+  return `
       <figure class="md-image-figure">
         <img src="${href}" alt="${altText}"${safeTitle} class="md-image" loading="lazy" />
         ${altText && altText !== 'Imagem' ? `<figcaption class="md-image-caption">${altText}</figcaption>` : ''}
       </figure>
     `;
+}
+
+function createCustomRenderer(headings) {
+  const slugCounts = {};
+  const renderer = new marked.Renderer();
+
+  renderer.heading = function (textOrObj, levelOrUndefined, rawOrUndefined) {
+    return renderHeading(this, slugCounts, headings, textOrObj, levelOrUndefined, rawOrUndefined);
+  };
+
+  renderer.code = function (codeOrObj, infostringOrUndefined) {
+    return renderCode(codeOrObj, infostringOrUndefined);
+  };
+
+  renderer.blockquote = function (quoteOrObj) {
+    return renderBlockquote(this, quoteOrObj);
+  };
+
+  renderer.table = function (headerOrObj, bodyOrUndefined) {
+    return renderTable(this, headerOrObj, bodyOrUndefined);
+  };
+
+  renderer.listitem = function (textOrObj, taskOrUndefined, checkedOrUndefined) {
+    return renderListitem(this, textOrObj, taskOrUndefined, checkedOrUndefined);
+  };
+
+  renderer.link = function (hrefOrObj, titleOrUndefined, textOrUndefined) {
+    return renderLink(this, hrefOrObj, titleOrUndefined, textOrUndefined);
+  };
+
+  renderer.image = function (hrefOrObj, titleOrUndefined, textOrUndefined) {
+    return renderImage(this, hrefOrObj, titleOrUndefined, textOrUndefined);
   };
 
   return renderer;
@@ -468,6 +501,14 @@ const exportsObj = {
 if (process.env.NODE_ENV === 'test') {
   exportsObj.processMath = processMath;
   exportsObj.renderCache = renderCache;
+  exportsObj.renderHeading = renderHeading;
+  exportsObj.renderCode = renderCode;
+  exportsObj.renderBlockquote = renderBlockquote;
+  exportsObj.renderTable = renderTable;
+  exportsObj.renderListitem = renderListitem;
+  exportsObj.renderLink = renderLink;
+  exportsObj.renderImage = renderImage;
+  exportsObj.createCustomRenderer = createCustomRenderer;
 }
 
 module.exports = exportsObj;
