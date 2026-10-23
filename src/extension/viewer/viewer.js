@@ -519,61 +519,83 @@ class MDViewerExtensionApp extends MDViewerBase {
     this.openDocumentTab(file.name, text, file.name, fileHandle);
   }
 
+  shouldIgnoreEntry(name) {
+    if (!name) return true;
+    return name.startsWith('.') ||
+      name === 'node_modules' ||
+      name === '__pycache__' ||
+      name === 'dist' ||
+      name === 'build' ||
+      name === '.git';
+  }
+
+  isSupportedMarkdownFile(name) {
+    if (!name) return false;
+    const lower = name.toLowerCase();
+    return lower.endsWith('.md') || lower.endsWith('.markdown') || lower.endsWith('.mdown') || lower.endsWith('.txt');
+  }
+
+  async processDirectoryEntry(entry, currentRelPath, depth) {
+    if (this.shouldIgnoreEntry(entry.name)) {
+      return null;
+    }
+
+    const relPath = currentRelPath ? `${currentRelPath}/${entry.name}` : entry.name;
+
+    if (entry.kind === 'directory') {
+      const children = await this.scanDirectoryHandle(entry, relPath, depth + 1);
+      if (children.length > 0) {
+        return {
+          name: entry.name,
+          path: relPath,
+          relPath: relPath,
+          isDirectory: true,
+          children: children
+        };
+      }
+      return null;
+    }
+
+    if (entry.kind === 'file' && this.isSupportedMarkdownFile(entry.name)) {
+      return {
+        name: entry.name,
+        path: relPath,
+        relPath: relPath,
+        isDirectory: false,
+        isMarkdown: true,
+        handle: entry
+      };
+    }
+
+    return null;
+  }
+
+  sortDirectoryEntries(entries) {
+    return entries.sort((a, b) => {
+      if (a.isDirectory && !b.isDirectory) return -1;
+      if (!a.isDirectory && b.isDirectory) return 1;
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }
+
+  async scanDirectoryHandle(handle, currentRelPath = '', depth = 0) {
+    if (depth > 12) return [];
+
+    const promises = [];
+    for await (const entry of handle.values()) {
+      promises.push(this.processDirectoryEntry(entry, currentRelPath, depth));
+    }
+
+    const results = await Promise.all(promises);
+    const entries = results.filter(Boolean);
+    return this.sortDirectoryEntries(entries);
+  }
+
   async handleOpenFolder() {
     if ('showDirectoryPicker' in window) {
       try {
         const dirHandle = await window.showDirectoryPicker();
-        
-        async function scanDirectoryHandle(handle, currentRelPath = '', depth = 0) {
-          if (depth > 12) return [];
-          const promises = [];
-          for await (const entry of handle.values()) {
-            if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === '__pycache__' || entry.name === 'dist' || entry.name === 'build' || entry.name === '.git') {
-              continue;
-            }
-            const relPath = currentRelPath ? `${currentRelPath}/${entry.name}` : entry.name;
-            if (entry.kind === 'directory') {
-              promises.push(
-                scanDirectoryHandle(entry, relPath, depth + 1).then(children => {
-                  if (children.length > 0) {
-                    return {
-                      name: entry.name,
-                      path: relPath,
-                      relPath: relPath,
-                      isDirectory: true,
-                      children: children
-                    };
-                  }
-                  return null;
-                })
-              );
-            } else if (entry.kind === 'file') {
-              const lower = entry.name.toLowerCase();
-              if (lower.endsWith('.md') || lower.endsWith('.markdown') || lower.endsWith('.mdown') || lower.endsWith('.txt')) {
-                promises.push(Promise.resolve({
-                  name: entry.name,
-                  path: relPath,
-                  relPath: relPath,
-                  isDirectory: false,
-                  isMarkdown: true,
-                  handle: entry
-                }));
-              }
-            }
-          }
-
-          const results = await Promise.all(promises);
-          const entries = results.filter(Boolean);
-
-          // Ordenar: pastas primeiro, depois arquivos alfabeticamente com ordenação numérica natural (ex: 01, 02... 10)
-          return entries.sort((a, b) => {
-            if (a.isDirectory && !b.isDirectory) return -1;
-            if (!a.isDirectory && b.isDirectory) return 1;
-            return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
-          });
-        }
-
-        const tree = await scanDirectoryHandle(dirHandle);
+        const tree = await this.scanDirectoryHandle(dirHandle);
         this.renderFolderTree(dirHandle.name, tree);
       } catch (err) {
         if (err.name !== 'AbortError') {

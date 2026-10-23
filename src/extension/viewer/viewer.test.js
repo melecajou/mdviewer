@@ -913,6 +913,78 @@ describe('MDViewerExtensionApp', () => {
       expect(app.explorerFolderName.textContent).toBe('MyFolder');
     });
 
+    describe('Directory Scanning Helpers', () => {
+      it('shouldIgnoreEntry should correctly identify files/folders to ignore', () => {
+        expect(app.shouldIgnoreEntry('')).toBe(true);
+        expect(app.shouldIgnoreEntry(null)).toBe(true);
+        expect(app.shouldIgnoreEntry('.git')).toBe(true);
+        expect(app.shouldIgnoreEntry('.env')).toBe(true);
+        expect(app.shouldIgnoreEntry('node_modules')).toBe(true);
+        expect(app.shouldIgnoreEntry('__pycache__')).toBe(true);
+        expect(app.shouldIgnoreEntry('dist')).toBe(true);
+        expect(app.shouldIgnoreEntry('build')).toBe(true);
+        expect(app.shouldIgnoreEntry('src')).toBe(false);
+        expect(app.shouldIgnoreEntry('README.md')).toBe(false);
+      });
+
+      it('isSupportedMarkdownFile should accurately detect supported file extensions', () => {
+        expect(app.isSupportedMarkdownFile('doc.md')).toBe(true);
+        expect(app.isSupportedMarkdownFile('doc.MARKDOWN')).toBe(true);
+        expect(app.isSupportedMarkdownFile('doc.mdown')).toBe(true);
+        expect(app.isSupportedMarkdownFile('notes.txt')).toBe(true);
+        expect(app.isSupportedMarkdownFile('image.png')).toBe(false);
+        expect(app.isSupportedMarkdownFile('script.js')).toBe(false);
+        expect(app.isSupportedMarkdownFile('')).toBe(false);
+      });
+
+      it('sortDirectoryEntries should sort directories first and naturally sort file names', () => {
+        const entries = [
+          { name: 'file10.md', isDirectory: false },
+          { name: 'folderB', isDirectory: true },
+          { name: 'file2.md', isDirectory: false },
+          { name: 'folderA', isDirectory: true }
+        ];
+
+        const sorted = app.sortDirectoryEntries(entries);
+        expect(sorted.map(e => e.name)).toEqual(['folderA', 'folderB', 'file2.md', 'file10.md']);
+      });
+
+      it('scanDirectoryHandle should scan recursively up to depth limit and ignore invalid entries', async () => {
+        const subFolderFile = { kind: 'file', name: 'sub.md' };
+        const subFolderHandle = {
+          kind: 'directory',
+          name: 'subfolder',
+          values: jest.fn().mockReturnValue([subFolderFile][Symbol.iterator]())
+        };
+
+        const rootHandle = {
+          kind: 'directory',
+          name: 'root',
+          values: jest.fn().mockReturnValue([
+            { kind: 'file', name: '.ignored' },
+            { kind: 'file', name: 'ignored.png' },
+            { kind: 'file', name: '01-intro.md' },
+            subFolderHandle
+          ][Symbol.iterator]())
+        };
+
+        const tree = await app.scanDirectoryHandle(rootHandle);
+
+        expect(tree.length).toBe(2); // 'subfolder' and '01-intro.md'
+        expect(tree[0].name).toBe('subfolder');
+        expect(tree[0].isDirectory).toBe(true);
+        expect(tree[0].children[0].name).toBe('sub.md');
+        expect(tree[1].name).toBe('01-intro.md');
+        expect(tree[1].isDirectory).toBe(false);
+      });
+
+      it('scanDirectoryHandle should return empty array if max depth exceeds 12', async () => {
+        const dummyHandle = { values: jest.fn() };
+        const result = await app.scanDirectoryHandle(dummyHandle, 'a/b/c', 13);
+        expect(result).toEqual([]);
+      });
+    });
+
     it('should render file list in explorer correctly constructing folder tree', () => {
       const files = [
         { name: 'root.md', webkitRelativePath: 'MyProject/root.md' },
