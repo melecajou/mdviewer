@@ -1,6 +1,20 @@
 const hljs = require('highlight.js');
 const katex = require('katex');
-const { slugify, parseMarkdown, splitHighlightedLines, processMath, renderCache } = require('./markdown-engine');
+const {
+  slugify,
+  parseMarkdown,
+  splitHighlightedLines,
+  processMath,
+  renderCache,
+  renderHeading,
+  renderCode,
+  renderBlockquote,
+  renderTable,
+  renderListItem,
+  renderLink,
+  renderImage,
+  createCustomRenderer
+} = require('./markdown-engine');
 
 describe('slugify', () => {
   test('should lowercase text', () => {
@@ -372,6 +386,171 @@ describe('processMath', () => {
     const result = restoreMath(htmlWithUnmatchedPlaceholder);
 
     expect(result).toBe('<div> and </div>');
+  });
+});
+
+describe('Extracted Renderer Helper Functions', () => {
+  describe('renderHeading', () => {
+    test('should render string text heading and record in headings array', () => {
+      const headings = [];
+      const slugCounts = {};
+      const html = renderHeading(null, headings, slugCounts, 'My Heading', 2, 'My Heading');
+
+      expect(html).toContain('<h2 id="my-heading" class="md-heading md-h2">');
+      expect(html).toContain('<span class="heading-text">My Heading</span>');
+      expect(headings).toEqual([{ level: 2, text: 'My Heading', id: 'my-heading' }]);
+      expect(slugCounts['my-heading']).toBe(0);
+    });
+
+    test('should render token object heading using parser context', () => {
+      const headings = [];
+      const slugCounts = {};
+      const mockContext = {
+        parser: {
+          parseInline: jest.fn().mockReturnValue('<em>Formatted</em> Heading')
+        }
+      };
+      const tokenObj = {
+        depth: 3,
+        tokens: [{ type: 'em', text: 'Formatted' }, { type: 'text', text: ' Heading' }],
+        text: 'Formatted Heading'
+      };
+
+      const html = renderHeading(mockContext, headings, slugCounts, tokenObj);
+
+      expect(mockContext.parser.parseInline).toHaveBeenCalledWith(tokenObj.tokens);
+      expect(html).toContain('<h3 id="formatted-heading" class="md-heading md-h3">');
+      expect(headings).toEqual([{ level: 3, text: 'Formatted Heading', id: 'formatted-heading' }]);
+    });
+  });
+
+  describe('renderCode', () => {
+    test('should render mermaid diagram code block', () => {
+      const html = renderCode('graph TD;\nA-->B;', 'mermaid');
+      expect(html).toContain('class="mermaid-block-wrapper"');
+      expect(html).toContain('Diagrama Mermaid');
+      expect(html).toContain('graph TD;\nA-->B;');
+    });
+
+    test('should handle code block object input', () => {
+      const html = renderCode({ text: 'const a = 1;', lang: 'js' });
+      expect(html).toContain('code-lang-badge');
+      expect(html).toContain('js');
+    });
+  });
+
+  describe('renderBlockquote', () => {
+    test('should render GitHub callout alert when quote matches callout pattern', () => {
+      const html = renderBlockquote(null, '<p>[!WARNING]<br>Watch out!</p>');
+      expect(html).toContain('class="markdown-alert markdown-alert-warning"');
+      expect(html).toContain('Aviso');
+      expect(html).toContain('Watch out!');
+    });
+
+    test('should render standard blockquote when not an alert', () => {
+      const html = renderBlockquote(null, '<p>Simple quote</p>');
+      expect(html).toContain('<blockquote><p>Simple quote</p></blockquote>');
+    });
+
+    test('should use context parser when token object is provided', () => {
+      const mockContext = {
+        parser: {
+          parse: jest.fn().mockReturnValue('<p>Parsed quote</p>')
+        }
+      };
+      const html = renderBlockquote(mockContext, { tokens: [{ type: 'paragraph' }] });
+      expect(mockContext.parser.parse).toHaveBeenCalled();
+      expect(html).toBe('<blockquote><p>Parsed quote</p></blockquote>');
+    });
+  });
+
+  describe('renderTable', () => {
+    test('should wrap table output in table-responsive container', () => {
+      const html = renderTable(null, '<thead><tr><th>Header</th></tr></thead>', '<tbody><tr><td>Body</td></tr></tbody>');
+      expect(html).toContain('<div class="table-responsive">');
+      expect(html).toContain('<table>');
+    });
+  });
+
+  describe('renderListItem', () => {
+    test('should render standard list item', () => {
+      expect(renderListItem(null, 'Item 1')).toBe('<li>Item 1</li>');
+    });
+
+    test('should render task list item', () => {
+      const html = renderListItem(null, 'Task item', true, true);
+      expect(html).toContain('class="task-list-item task-checked"');
+      expect(html).toContain('type="checkbox"');
+      expect(html).toContain('checked');
+    });
+
+    test('should handle object token input for list item', () => {
+      const mockContext = {
+        parser: {
+          parse: jest.fn().mockReturnValue('Parsed task text')
+        }
+      };
+      const html = renderListItem(mockContext, { tokens: [], task: true, checked: false });
+      expect(html).toContain('class="task-list-item task-unchecked"');
+      expect(html).toContain('Parsed task text');
+    });
+  });
+
+  describe('renderLink', () => {
+    test('should render external link with icon and blank target', () => {
+      const html = renderLink(null, 'https://example.com', 'Example Title', 'Click here');
+      expect(html).toContain('class="external-link"');
+      expect(html).toContain('target="_blank"');
+      expect(html).toContain('title="Example Title"');
+      expect(html).toContain('Click here');
+    });
+
+    test('should render anchor link', () => {
+      const html = renderLink(null, '#section1', '', 'Section 1');
+      expect(html).toContain('class="anchor-link"');
+      expect(html).toContain('href="#section1"');
+    });
+
+    test('should render internal file link', () => {
+      const html = renderLink(null, 'doc.md', '', 'Doc');
+      expect(html).toContain('class="internal-link"');
+      expect(html).toContain('data-local-path="doc.md"');
+    });
+  });
+
+  describe('renderImage', () => {
+    test('should render image figure and caption', () => {
+      const html = renderImage(null, 'pic.png', 'Img Title', 'Caption text');
+      expect(html).toContain('<figure class="md-image-figure">');
+      expect(html).toContain('<img src="pic.png" alt="Caption text" title="Img Title"');
+      expect(html).toContain('<figcaption class="md-image-caption">Caption text</figcaption>');
+    });
+
+    test('should handle object token input for image', () => {
+      const mockContext = {
+        parser: {
+          textRenderer: {},
+          parseInline: jest.fn().mockReturnValue('Alt from tokens')
+        }
+      };
+      const html = renderImage(mockContext, { href: 'pic.png', title: '', tokens: [] });
+      expect(mockContext.parser.parseInline).toHaveBeenCalled();
+      expect(html).toContain('alt="Alt from tokens"');
+    });
+  });
+
+  describe('createCustomRenderer', () => {
+    test('should return a renderer instance with overridden functions', () => {
+      const headings = [];
+      const renderer = createCustomRenderer(headings);
+      expect(typeof renderer.heading).toBe('function');
+      expect(typeof renderer.code).toBe('function');
+      expect(typeof renderer.blockquote).toBe('function');
+      expect(typeof renderer.table).toBe('function');
+      expect(typeof renderer.listitem).toBe('function');
+      expect(typeof renderer.link).toBe('function');
+      expect(typeof renderer.image).toBe('function');
+    });
   });
 });
 
