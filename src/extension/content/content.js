@@ -50,12 +50,14 @@
   }
 
   function escapeHtml(unsafe) {
-    return (unsafe || '').toString()
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+    return typeof MDViewerBase !== 'undefined' && MDViewerBase.escapeHtml
+      ? MDViewerBase.escapeHtml(unsafe)
+      : (unsafe || '').toString()
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
   }
 
   // Nome do arquivo
