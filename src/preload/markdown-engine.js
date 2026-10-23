@@ -40,6 +40,21 @@ const ALERT_TITLES = {
   caution: 'Cuidado'
 };
 
+function escapeAttr(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function slugify(text) {
   return text
     .toLowerCase()
@@ -357,16 +372,19 @@ function createCustomRenderer(headings) {
       text = textOrUndefined || '';
     }
 
-    const safeTitle = title ? ` title="${title}"` : '';
-    const isExternal = href && (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:'));
-    const isAnchor = href && href.startsWith('#');
-    
+    const cleanHref = href ? href.replace(/[\x00-\x20]/g, '').trim() : '';
+    const isDangerous = /^(javascript|data|vbscript):/i.test(cleanHref);
+    const safeHref = isDangerous ? '#' : escapeAttr(href);
+    const safeTitle = title ? ` title="${escapeAttr(title)}"` : '';
+    const isExternal = !isDangerous && href && (cleanHref.startsWith('http://') || cleanHref.startsWith('https://') || cleanHref.startsWith('mailto:'));
+    const isAnchor = !isDangerous && href && cleanHref.startsWith('#');
+
     if (isExternal) {
-      return `<a href="${href}"${safeTitle} class="external-link" target="_blank" rel="noopener noreferrer">${text}<svg class="external-icon" viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.5.75a.75.75 0 0 1 .75-.75h4.25c.414 0 .75.336.75.75v4.25a.75.75 0 0 1-1.5 0V3.56L9.53 8.53a.75.75 0 0 1-1.06-1.06L13.44 2.5H11a.75.75 0 0 1-.75-.75Z"/></svg></a>`;
+      return `<a href="${safeHref}"${safeTitle} class="external-link" target="_blank" rel="noopener noreferrer">${text}<svg class="external-icon" viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.5.75a.75.75 0 0 1 .75-.75h4.25c.414 0 .75.336.75.75v4.25a.75.75 0 0 1-1.5 0V3.56L9.53 8.53a.75.75 0 0 1-1.06-1.06L13.44 2.5H11a.75.75 0 0 1-.75-.75Z"/></svg></a>`;
     } else if (isAnchor) {
-      return `<a href="${href}"${safeTitle} class="anchor-link">${text}</a>`;
+      return `<a href="${safeHref}"${safeTitle} class="anchor-link">${text}</a>`;
     } else {
-      return `<a href="${href}"${safeTitle} class="internal-link" data-local-path="${href}">${text}</a>`;
+      return `<a href="${safeHref}"${safeTitle} class="internal-link" data-local-path="${safeHref}">${text}</a>`;
     }
   };
 
@@ -386,12 +404,17 @@ function createCustomRenderer(headings) {
       text = textOrUndefined || 'Imagem';
     }
 
-    const safeTitle = title ? ` title="${title}"` : '';
+    const cleanHref = href ? href.replace(/[\x00-\x20]/g, '').trim() : '';
+    const isDangerous = /^(javascript|data|vbscript):/i.test(cleanHref);
+    const safeHref = isDangerous ? '#' : escapeAttr(href);
+    const safeTitle = title ? ` title="${escapeAttr(title)}"` : '';
     const altText = text || 'Imagem';
+    const safeAltText = escapeAttr(altText);
+
     return `
       <figure class="md-image-figure">
-        <img src="${href}" alt="${altText}"${safeTitle} class="md-image" loading="lazy" />
-        ${altText && altText !== 'Imagem' ? `<figcaption class="md-image-caption">${altText}</figcaption>` : ''}
+        <img src="${safeHref}" alt="${safeAltText}"${safeTitle} class="md-image" loading="lazy" />
+        ${altText && altText !== 'Imagem' ? `<figcaption class="md-image-caption">${safeAltText}</figcaption>` : ''}
       </figure>
     `;
   };
