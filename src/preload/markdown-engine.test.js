@@ -1,6 +1,20 @@
 const hljs = require('highlight.js');
 const katex = require('katex');
-const { slugify, parseMarkdown, splitHighlightedLines, processMath, renderCache } = require('./markdown-engine');
+const {
+  slugify,
+  parseMarkdown,
+  splitHighlightedLines,
+  processMath,
+  renderCache,
+  renderHeading,
+  renderCode,
+  renderBlockquote,
+  renderTable,
+  renderListitem,
+  renderLink,
+  renderImage,
+  createCustomRenderer
+} = require('./markdown-engine');
 
 describe('slugify', () => {
   test('should lowercase text', () => {
@@ -434,5 +448,172 @@ describe('splitHighlightedLines', () => {
       'const x = 1;'
     ];
     expect(splitHighlightedLines(input)).toEqual(expected);
+  });
+});
+
+describe('Extracted Custom Renderer Helper Functions', () => {
+  describe('renderHeading', () => {
+    test('renders string inputs and populates headings array with correct slug and level', () => {
+      const headings = [];
+      const slugCounts = {};
+
+      const result = renderHeading(null, slugCounts, headings, 'Section One', 2, 'Section One');
+      expect(result).toContain('<h2 id="section-one" class="md-heading md-h2">');
+      expect(result).toContain('heading-anchor');
+      expect(result).toContain('<span class="heading-text">Section One</span>');
+      expect(headings).toEqual([{ level: 2, text: 'Section One', id: 'section-one' }]);
+    });
+
+    test('handles token object inputs with custom parser', () => {
+      const headings = [];
+      const slugCounts = {};
+      const mockParser = {
+        parseInline: jest.fn().mockReturnValue('<em>Formatted</em> Heading')
+      };
+      const context = { parser: mockParser };
+      const tokenObj = {
+        depth: 3,
+        tokens: [{ type: 'em', text: 'Formatted' }],
+        text: 'Formatted Heading'
+      };
+
+      const result = renderHeading(context, slugCounts, headings, tokenObj);
+      expect(mockParser.parseInline).toHaveBeenCalledWith(tokenObj.tokens);
+      expect(result).toContain('<h3 id="formatted-heading" class="md-heading md-h3">');
+      expect(result).toContain('<em>Formatted</em> Heading');
+      expect(headings).toEqual([{ level: 3, text: 'Formatted Heading', id: 'formatted-heading' }]);
+    });
+
+    test('increments slug counts on duplicate headings', () => {
+      const headings = [];
+      const slugCounts = {};
+
+      renderHeading(null, slugCounts, headings, 'Overview', 1);
+      renderHeading(null, slugCounts, headings, 'Overview', 1);
+
+      expect(headings[0].id).toBe('overview');
+      expect(headings[1].id).toBe('overview-1');
+    });
+  });
+
+  describe('renderCode', () => {
+    test('renders mermaid code block wrapper when lang is mermaid', () => {
+      const result = renderCode('graph LR; A-->B;', 'mermaid');
+      expect(result).toContain('class="mermaid-block-wrapper"');
+      expect(result.html || result).toContain('Diagrama Mermaid');
+      expect(result).toContain('<div class="mermaid">graph LR; A-->B;</div>');
+    });
+
+    test('renders syntax highlighted code block with line numbers for code object', () => {
+      const codeObj = { text: 'let y = 10;', lang: 'js' };
+      const result = renderCode(codeObj);
+      expect(result).toContain('class="code-block-wrapper"');
+      expect(result).toContain('<span class="code-lang-badge">js</span>');
+      expect(result).toContain('data-line="1"');
+      expect(result).toContain('let');
+    });
+  });
+
+  describe('renderBlockquote', () => {
+    test('renders GitHub alert callouts for note, tip, warning, important, caution', () => {
+      const alertTypes = ['note', 'tip', 'important', 'warning', 'caution'];
+      alertTypes.forEach((type) => {
+        const input = `<p>[!${type.toUpperCase()}]\nSome ${type} alert message</p>`;
+        const result = renderBlockquote(null, input);
+        expect(result).toContain(`class="markdown-alert markdown-alert-${type}"`);
+        expect(result).toContain(`Some ${type} alert message`);
+      });
+    });
+
+    test('renders token object for blockquote using parser', () => {
+      const mockParser = {
+        parse: jest.fn().mockReturnValue('<p>Inside blockquote</p>')
+      };
+      const context = { parser: mockParser };
+      const tokenObj = { tokens: [{ type: 'paragraph' }] };
+
+      const result = renderBlockquote(context, tokenObj);
+      expect(mockParser.parse).toHaveBeenCalledWith(tokenObj.tokens);
+      expect(result).toBe('<blockquote><p>Inside blockquote</p></blockquote>');
+    });
+  });
+
+  describe('renderTable', () => {
+    test('wraps rendered table HTML in table-responsive container', () => {
+      const result = renderTable(null, '<thead><tr><th>Col</th></tr></thead>', '<tbody><tr><td>Val</td></tr></tbody>');
+      expect(result).toContain('<div class="table-responsive">');
+      expect(result).toContain('</div>');
+    });
+  });
+
+  describe('renderListitem', () => {
+    test('renders task list item when task is true', () => {
+      const resultUnchecked = renderListitem(null, 'Do task', true, false);
+      expect(resultUnchecked).toContain('class="task-list-item task-unchecked"');
+      expect(resultUnchecked).toContain('<input type="checkbox" class="task-checkbox"  disabled />');
+      expect(resultUnchecked).toContain('Do task');
+
+      const resultChecked = renderListitem(null, 'Done task', true, true);
+      expect(resultChecked).toContain('class="task-list-item task-checked"');
+      expect(resultChecked).toContain('checked');
+    });
+
+    test('renders standard list item when not a task', () => {
+      const result = renderListitem(null, 'Simple item');
+      expect(result).toBe('<li>Simple item</li>');
+    });
+  });
+
+  describe('renderLink', () => {
+    test('renders external links with target=_blank and external icon', () => {
+      const result = renderLink(null, 'https://example.com', 'Example', 'Click Here');
+      expect(result).toContain('class="external-link"');
+      expect(result).toContain('target="_blank"');
+      expect(result).toContain('rel="noopener noreferrer"');
+      expect(result).toContain('title="Example"');
+      expect(result).toContain('Click Here');
+      expect(result).toContain('external-icon');
+    });
+
+    test('renders anchor links for relative hash hrefs', () => {
+      const result = renderLink(null, '#section', '', 'Section');
+      expect(result).toContain('class="anchor-link"');
+      expect(result).toContain('href="#section"');
+    });
+
+    test('renders internal links with data-local-path attribute', () => {
+      const result = renderLink(null, 'doc.md', '', 'Document');
+      expect(result).toContain('class="internal-link"');
+      expect(result).toContain('data-local-path="doc.md"');
+    });
+  });
+
+  describe('renderImage', () => {
+    test('renders image figure with img and optional figcaption', () => {
+      const result = renderImage(null, 'img.png', 'Caption Title', 'Alt Description');
+      expect(result).toContain('<figure class="md-image-figure">');
+      expect(result).toContain('<img src="img.png" alt="Alt Description" title="Caption Title" class="md-image" loading="lazy" />');
+      expect(result).toContain('<figcaption class="md-image-caption">Alt Description</figcaption>');
+    });
+
+    test('omits figcaption if alt text is default Imagem or empty', () => {
+      const result = renderImage(null, 'img.png', '', 'Imagem');
+      expect(result).not.toContain('<figcaption');
+    });
+  });
+
+  describe('createCustomRenderer integration', () => {
+    test('constructs a marked Renderer with bound helper methods', () => {
+      const headings = [];
+      const renderer = createCustomRenderer(headings);
+
+      expect(typeof renderer.heading).toBe('function');
+      expect(typeof renderer.code).toBe('function');
+      expect(typeof renderer.blockquote).toBe('function');
+      expect(typeof renderer.table).toBe('function');
+      expect(typeof renderer.listitem).toBe('function');
+      expect(typeof renderer.link).toBe('function');
+      expect(typeof renderer.image).toBe('function');
+    });
   });
 });
