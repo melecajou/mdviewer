@@ -46,7 +46,7 @@ jest.mock('./file-watcher', () => {
 const fs = require('fs');
 const path = require('path');
 const { BrowserWindow, ipcMain, shell, nativeImage } = require('electron');
-const { normalizeCliArg, parseCommandLineArgs, addAllowedPath, allowedPaths, isIgnoredArg, isIgnoredDir, isPathAllowed, isSystemOrRootDirectory, loadIconConfig, getIconConfigSync, _clearAllowedPaths, _resetCachedIconConfig } = require('./main');
+const { normalizeCliArg, mapConcurrent, parseCommandLineArgs, addAllowedPath, allowedPaths, isIgnoredArg, isIgnoredDir, isPathAllowed, isSystemOrRootDirectory, loadIconConfig, getIconConfigSync, _clearAllowedPaths, _resetCachedIconConfig } = require('./main');
 
 const ipcMainHandlers = new Map(ipcMain.handle.mock.calls);
 const openExternalHandler = ipcMainHandlers.get('shell:open-external');
@@ -383,6 +383,30 @@ describe('isPathAllowed', () => {
     } finally {
       path.resolve = originalResolve;
     }
+  });
+});
+
+describe('mapConcurrent', () => {
+  it('should return empty array when items array is empty or null', async () => {
+    expect(await mapConcurrent([], 5, async (x) => x)).toEqual([]);
+    expect(await mapConcurrent(null, 5, async (x) => x)).toEqual([]);
+  });
+
+  it('should map items while respecting max concurrency limit', async () => {
+    let active = 0;
+    let maxActive = 0;
+    const items = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+    const results = await mapConcurrent(items, 3, async (item) => {
+      active++;
+      if (active > maxActive) maxActive = active;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      active--;
+      return item * 2;
+    });
+
+    expect(results).toEqual([2, 4, 6, 8, 10, 12, 14, 16, 18, 20]);
+    expect(maxActive).toBeLessThanOrEqual(3);
   });
 });
 
