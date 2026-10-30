@@ -1302,15 +1302,14 @@ class MDViewerExtensionApp extends MDViewerBase {
   }
 
   // Render Engine
-  renderMarkdown(content) {
+  parseMarkdownContent(content) {
     if (!window.MDViewerEngine || !window.MDViewerEngine.parseMarkdown) {
       this.markdownContainer.innerHTML = `<div style="padding: 24px; color: var(--color-error, #f85149);"><p><strong>Erro:</strong> Motor MDViewerEngine não foi carregado.</p></div>`;
-      return;
+      return null;
     }
 
-    let parsed;
     try {
-      parsed = window.MDViewerEngine.parseMarkdown(content);
+      return window.MDViewerEngine.parseMarkdown(content);
     } catch (err) {
       console.error('Erro ao renderizar markdown:', err);
       const errorDiv = document.createElement('div');
@@ -1336,12 +1335,11 @@ class MDViewerExtensionApp extends MDViewerBase {
 
       this.markdownContainer.innerHTML = '';
       this.markdownContainer.appendChild(errorDiv);
-      return;
+      return null;
     }
+  }
 
-    const { html, headings, stats } = parsed;
-
-    // Inject HTML (Sanitized to prevent XSS)
+  sanitizeAndInjectHtml(html) {
     const purify = typeof DOMPurify !== 'undefined' ? DOMPurify : null;
     if (!purify || typeof purify.sanitize !== 'function') {
       throw new Error('DOMPurify library is required for rendering markdown content securely.');
@@ -1351,8 +1349,44 @@ class MDViewerExtensionApp extends MDViewerBase {
     });
 
     this.markdownContainer.innerHTML = sanitizedHtml;
-    this.headings = headings;
+  }
 
+  resolveRelativeImages() {
+    const activeTab = this.getActiveTab();
+    if (!activeTab || !activeTab.path) return;
+
+    let basePath = '';
+    if (activeTab.path.includes('/')) {
+      basePath = activeTab.path.substring(0, activeTab.path.lastIndexOf('/') + 1);
+    } else if (activeTab.path.includes('\\')) {
+      basePath = activeTab.path.substring(0, activeTab.path.lastIndexOf('\\') + 1);
+    }
+
+    this.markdownContainer.querySelectorAll('.md-image, img').forEach(img => {
+      const rawSrc = img.getAttribute('src');
+      if (rawSrc && !rawSrc.startsWith('http://') && !rawSrc.startsWith('https://') && !rawSrc.startsWith('data:') && !rawSrc.startsWith('chrome-extension:')) {
+        if (rawSrc.startsWith('file://')) {
+          // URL completa
+        } else if (basePath.startsWith('file://')) {
+          img.src = basePath + rawSrc;
+        } else if (basePath.startsWith('/') || /^[a-zA-Z]:/.test(basePath)) {
+          img.src = 'file://' + basePath + rawSrc;
+        }
+      }
+
+      // Fallback de erro para ícones da aplicação
+      img.addEventListener('error', () => {
+        const s = img.getAttribute('src') || '';
+        if (s.includes('icon.svg')) {
+          img.src = chrome.runtime.getURL('assets/icon.svg');
+        } else if (s.includes('icon.png')) {
+          img.src = chrome.runtime.getURL('assets/icon.png');
+        }
+      }, { once: true });
+    });
+  }
+
+  attachPreviewEventListeners() {
     // Attach heading anchor copy link
     const headingAnchors = this.markdownContainer.querySelectorAll('.heading-anchor');
     headingAnchors.forEach(anchor => {
@@ -1361,47 +1395,6 @@ class MDViewerExtensionApp extends MDViewerBase {
         navigator.clipboard.writeText(window.location.origin + window.location.pathname + window.location.search + '#' + id);
       });
     });
-
-    // Resolver caminhos de imagens relativas baseando-se no caminho do arquivo atual
-    const activeTab = this.getActiveTab();
-    if (activeTab && activeTab.path) {
-      let basePath = '';
-      if (activeTab.path.includes('/')) {
-        basePath = activeTab.path.substring(0, activeTab.path.lastIndexOf('/') + 1);
-      } else if (activeTab.path.includes('\\')) {
-        basePath = activeTab.path.substring(0, activeTab.path.lastIndexOf('\\') + 1);
-      }
-
-      this.markdownContainer.querySelectorAll('.md-image, img').forEach(img => {
-        const rawSrc = img.getAttribute('src');
-        if (rawSrc && !rawSrc.startsWith('http://') && !rawSrc.startsWith('https://') && !rawSrc.startsWith('data:') && !rawSrc.startsWith('chrome-extension:')) {
-          if (rawSrc.startsWith('file://')) {
-            // URL completa
-          } else if (basePath.startsWith('file://')) {
-            img.src = basePath + rawSrc;
-          } else if (basePath.startsWith('/') || /^[a-zA-Z]:/.test(basePath)) {
-            img.src = 'file://' + basePath + rawSrc;
-          }
-        }
-
-        // Fallback de erro para ícones da aplicação
-        img.addEventListener('error', () => {
-          const s = img.getAttribute('src') || '';
-          if (s.includes('icon.svg')) {
-            img.src = chrome.runtime.getURL('assets/icon.svg');
-          } else if (s.includes('icon.png')) {
-            img.src = chrome.runtime.getURL('assets/icon.png');
-          }
-        }, { once: true });
-      });
-    }
-
-    // Atualizar status bar
-    this.statusStats.textContent = `${stats.words.toLocaleString()} palavras • ${stats.lines} linhas`;
-    this.statusReadTime.textContent = `${stats.readTimeMinutes} min de leitura`;
-
-    // Atualizar TOC
-    this.renderTOC(headings);
 
     // Conectar botões de copiar código
     this.markdownContainer.querySelectorAll('.copy-code-button').forEach(btn => {
@@ -1429,21 +1422,43 @@ class MDViewerExtensionApp extends MDViewerBase {
         this.toggleTaskCheckbox(index, chk.checked);
       });
     });
+  }
 
-    // Renderizar diagramas Mermaid
-    if (window.mermaid) {
-      try {
-        const isDark = !document.documentElement.getAttribute('data-theme')?.includes('light');
-        window.mermaid.initialize({
-          startOnLoad: false,
-          theme: isDark ? 'dark' : 'default',
-          securityLevel: 'strict'
-        });
-        window.mermaid.run({
-          nodes: this.markdownContainer.querySelectorAll('.mermaid')
-        });
-      } catch {}
-    }
+  renderMermaidDiagrams() {
+    if (!window.mermaid) return;
+    try {
+      const isDark = !document.documentElement.getAttribute('data-theme')?.includes('light');
+      window.mermaid.initialize({
+        startOnLoad: false,
+        theme: isDark ? 'dark' : 'default',
+        securityLevel: 'strict'
+      });
+      window.mermaid.run({
+        nodes: this.markdownContainer.querySelectorAll('.mermaid')
+      });
+    } catch {}
+  }
+
+  renderMarkdown(content) {
+    const parsed = this.parseMarkdownContent(content);
+    if (!parsed) return;
+
+    const { html, headings, stats } = parsed;
+
+    this.sanitizeAndInjectHtml(html);
+    this.headings = headings;
+
+    this.resolveRelativeImages();
+
+    // Atualizar status bar
+    this.statusStats.textContent = `${stats.words.toLocaleString()} palavras • ${stats.lines} linhas`;
+    this.statusReadTime.textContent = `${stats.readTimeMinutes} min de leitura`;
+
+    // Atualizar TOC
+    this.renderTOC(headings);
+
+    this.attachPreviewEventListeners();
+    this.renderMermaidDiagrams();
   }
 
   renderTOC(headings) {
