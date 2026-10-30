@@ -127,7 +127,7 @@ function normalizeCliArg(arg) {
   }
 }
 
-function resolveCliTarget(arg, cwd, appPath, mainScriptPath, existsCache = null) {
+async function resolveCliTarget(arg, cwd, appPath, mainScriptPath, existsCache = null) {
   if (!arg || typeof arg !== 'string') return null;
   if (isIgnoredArg(arg)) return null;
 
@@ -146,7 +146,12 @@ function resolveCliTarget(arg, cwd, appPath, mainScriptPath, existsCache = null)
     if (existsCache && existsCache.has(resolved)) {
       exists = existsCache.get(resolved);
     } else {
-      exists = fs.existsSync(resolved);
+      try {
+        await fs.promises.access(resolved);
+        exists = true;
+      } catch {
+        exists = false;
+      }
       if (existsCache) {
         existsCache.set(resolved, exists);
       }
@@ -163,16 +168,20 @@ function resolveCliTarget(arg, cwd, appPath, mainScriptPath, existsCache = null)
 }
 
 // Parse file/folder paths from command line arguments
-function parseCommandLineArgs(argv, cwd = process.cwd()) {
+async function parseCommandLineArgs(argv, cwd = process.cwd()) {
   if (!Array.isArray(argv)) return [];
 
   const appPath = path.resolve(__dirname, '../..');
   const mainScriptPath = path.resolve(__dirname, 'main.js');
 
   const existsCache = new Map();
+  const promises = argv.map((arg) =>
+    resolveCliTarget(arg, cwd, appPath, mainScriptPath, existsCache)
+  );
+  const resolvedTargets = await Promise.all(promises);
+
   const targets = [];
-  for (let i = 0; i < argv.length; i++) {
-    const target = resolveCliTarget(argv[i], cwd, appPath, mainScriptPath, existsCache);
+  for (const target of resolvedTargets) {
     if (target) {
       targets.push(target);
       addAllowedPath(target);
@@ -185,7 +194,11 @@ function parseCommandLineArgs(argv, cwd = process.cwd()) {
   return targets;
 }
 
-let pendingTargets = parseCommandLineArgs(process.argv);
+let pendingTargets = [];
+const initialTargetsPromise = parseCommandLineArgs(process.argv).then((targets) => {
+  pendingTargets = targets;
+  return targets;
+});
 
 // Single instance lock
 const gotTheLock = app.requestSingleInstanceLock();
@@ -193,8 +206,8 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 } else {
-  app.on('second-instance', (event, commandLine, workingDirectory) => {
-    const targets = parseCommandLineArgs(commandLine, workingDirectory);
+  app.on('second-instance', async (event, commandLine, workingDirectory) => {
+    const targets = await parseCommandLineArgs(commandLine, workingDirectory);
     targets.forEach(t => {
       addAllowedPath(t);
       const parentDir = path.dirname(t);
@@ -217,6 +230,7 @@ if (!gotTheLock) {
   app.whenReady().then(async () => {
     await store.init();
     await loadIconConfig();
+    await initialTargetsPromise;
 
     // Initialize Allowed Paths from store and other known locations
     const allSettings = store.getAll();
