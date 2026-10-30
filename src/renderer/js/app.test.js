@@ -406,6 +406,150 @@ describe('MDViewerApp - bindEvents refactoring', () => {
     });
   });
 
+  describe('renderMarkdown decomposed helper methods', () => {
+    beforeEach(() => {
+      const DOMPurifyModule = require('dompurify');
+      window.DOMPurify = DOMPurifyModule;
+    });
+
+    afterEach(() => {
+      delete window.DOMPurify;
+    });
+
+    it('should invoke all decomposed helpers in renderMarkdown', () => {
+      window.electronAPI.parseMarkdown = jest.fn().mockReturnValue({
+        html: '<h1>Title</h1>',
+        headings: [{ id: 'title', text: 'Title', level: 1 }],
+        stats: { words: 10, lines: 2, readTimeMinutes: 1 }
+      });
+
+      app.setupHeadingAnchors = jest.fn();
+      app.updateStatusBarStats = jest.fn();
+      app.setupPreviewImages = jest.fn();
+      app.setupCopyCodeButtons = jest.fn();
+      app.setupLinkInterceptors = jest.fn();
+      app.setupTaskCheckboxes = jest.fn();
+      app.renderMermaidDiagrams = jest.fn();
+      app.renderToc = jest.fn();
+
+      const tab = { content: '# Title', dirName: '/docs' };
+      app.renderMarkdown(tab);
+
+      expect(app.setupHeadingAnchors).toHaveBeenCalledTimes(1);
+      expect(app.updateStatusBarStats).toHaveBeenCalledWith({ words: 10, lines: 2, readTimeMinutes: 1 });
+      expect(app.setupPreviewImages).toHaveBeenCalledWith(tab);
+      expect(app.setupCopyCodeButtons).toHaveBeenCalledTimes(1);
+      expect(app.setupLinkInterceptors).toHaveBeenCalledWith(tab);
+      expect(app.setupTaskCheckboxes).toHaveBeenCalledTimes(1);
+      expect(app.renderMermaidDiagrams).toHaveBeenCalledTimes(1);
+      expect(app.renderToc).toHaveBeenCalledWith([{ id: 'title', text: 'Title', level: 1 }]);
+    });
+
+    it('should attach copy link listener to heading anchors in setupHeadingAnchors', () => {
+      app.markdownContainer.innerHTML = '<h2 id="section1"><a class="heading-anchor">#</a>Section 1</h2>';
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: jest.fn().mockResolvedValue() },
+        writable: true,
+        configurable: true
+      });
+
+      app.setupHeadingAnchors();
+      const anchor = app.markdownContainer.querySelector('.heading-anchor');
+      anchor.click();
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('#section1'));
+    });
+
+    it('should update status bar elements in updateStatusBarStats', () => {
+      app.updateStatusBarStats({ words: 150, lines: 20, readTimeMinutes: 2 });
+      expect(app.statusStats.textContent).toBe('150 palavras • 20 linhas');
+      expect(app.statusReadTime.textContent).toBe('2 min de leitura');
+    });
+
+    it('should resolve relative images and add lightbox click handler in setupPreviewImages', () => {
+      app.markdownContainer.innerHTML = '<img src="diagram.png" id="test-img">';
+      const tab = { dirName: '/home/user/notes' };
+
+      app.setupPreviewImages(tab);
+      const img = app.markdownContainer.querySelector('#test-img');
+      expect(img.src).toBe('file:///home/user/notes/diagram.png');
+
+      img.click();
+      expect(app.lightboxImg.src).toBe(img.src);
+      expect(app.lightboxModal.classList.contains('visible')).toBe(true);
+    });
+
+    it('should bind click listener to copy code buttons in setupCopyCodeButtons', () => {
+      app.markdownContainer.innerHTML = '<button class="copy-code-button" data-code="console.log(%22hi%22)"><span class="copy-text">Copiar</span></button>';
+      app.copyToClipboard = jest.fn();
+
+      app.setupCopyCodeButtons();
+      const btn = app.markdownContainer.querySelector('.copy-code-button');
+      btn.click();
+
+      expect(app.copyToClipboard).toHaveBeenCalledWith('console.log("hi")', expect.objectContaining({
+        button: btn,
+        copiedText: 'Copiado!'
+      }));
+    });
+
+    it('should intercept external links, hash anchors, and local paths in setupLinkInterceptors', () => {
+      app.markdownContainer.innerHTML = `
+        <a id="ext-link" href="https://example.com">External</a>
+        <a id="anchor-link" href="#target-heading">Anchor</a>
+        <a id="local-link" data-local-path="subfolder/doc.md">Local</a>
+        <div id="target-heading">Target</div>
+      `;
+      window.electronAPI.openExternal = jest.fn();
+      app.openFile = jest.fn();
+      const targetHeading = app.markdownContainer.querySelector('#target-heading');
+      targetHeading.scrollIntoView = jest.fn();
+
+      const tab = { dirName: '/workspace' };
+      app.setupLinkInterceptors(tab);
+
+      // External link
+      const extLink = app.markdownContainer.querySelector('#ext-link');
+      extLink.click();
+      expect(window.electronAPI.openExternal).toHaveBeenCalledWith('https://example.com');
+
+      // Hash link
+      const anchorLink = app.markdownContainer.querySelector('#anchor-link');
+      anchorLink.click();
+      expect(targetHeading.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth' });
+
+      // Local file link
+      const localLink = app.markdownContainer.querySelector('#local-link');
+      localLink.click();
+      expect(app.openFile).toHaveBeenCalledWith('/workspace/subfolder/doc.md');
+    });
+
+    it('should enable interaction for task checkboxes in setupTaskCheckboxes', () => {
+      app.markdownContainer.innerHTML = '<li class="task-list-item"><input type="checkbox" disabled> Task 1</li>';
+      app.toggleTaskCheckbox = jest.fn();
+
+      app.setupTaskCheckboxes();
+      const chk = app.markdownContainer.querySelector('input[type="checkbox"]');
+      expect(chk.disabled).toBe(false);
+
+      chk.checked = true;
+      chk.dispatchEvent(new Event('change'));
+      expect(app.toggleTaskCheckbox).toHaveBeenCalledWith(0, true);
+    });
+
+    it('should trigger Mermaid diagram rendering in renderMermaidDiagrams', () => {
+      app.markdownContainer.innerHTML = '<pre class="mermaid">graph TD; A-->B;</pre>';
+      window.mermaid = { run: jest.fn() };
+
+      app.renderMermaidDiagrams();
+      expect(window.mermaid.run).toHaveBeenCalledWith({
+        nodes: app.markdownContainer.querySelectorAll('.mermaid')
+      });
+
+      delete window.mermaid;
+    });
+  });
+
   describe('updateActiveTocHeading benchmark & correctness', () => {
     beforeEach(() => {
       const markdownContainer = document.getElementById('markdown-container');
