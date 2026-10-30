@@ -1147,10 +1147,11 @@ describe('MDViewerExtensionApp', () => {
   });
 
   describe('Event Listeners & Keyboard Shortcuts', () => {
-    it('should handle global keydown shortcuts', () => {
+    it('should handle global keydown shortcuts via shortcut registry', () => {
       const newFileSpy = jest.spyOn(app, 'handleNewFile').mockImplementation(() => {});
       const saveFileSpy = jest.spyOn(app, 'handleSaveFile').mockImplementation(() => {});
       const openFileSpy = jest.spyOn(app, 'handleOpenFile').mockImplementation(() => {});
+      const setViewModeSpy = jest.spyOn(app, 'setViewMode').mockImplementation(() => {});
 
       // Ctrl + N
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', ctrlKey: true }));
@@ -1163,6 +1164,14 @@ describe('MDViewerExtensionApp', () => {
       // Ctrl + O
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'o', ctrlKey: true }));
       expect(openFileSpy).toHaveBeenCalled();
+
+      // Alt + 1
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: '1', altKey: true }));
+      expect(setViewModeSpy).toHaveBeenCalledWith('preview');
+
+      // F1
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1' }));
+      expect(app.shortcutsModal.classList.contains('visible')).toBe(true);
     });
 
     it('should toggle sidebar on button click', () => {
