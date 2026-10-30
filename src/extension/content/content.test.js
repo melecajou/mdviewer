@@ -125,4 +125,46 @@ describe('Content script (content.js) - Security & Sanitization', () => {
     expect(titleEl.textContent).toBe(maliciousFilename);
     expect(titleEl.getAttribute('title')).toBe(maliciousFilename);
   });
+
+  it('should handle source mode toggle and TOC toggle interactions correctly', () => {
+    setupDOMWithMarkdownPre('# Heading 1\nContent');
+
+    window.MDViewerEngine = {
+      parseMarkdown: jest.fn(() => ({
+        html: '<h1>Heading 1</h1><p>Content</p>',
+        headings: [{ id: 'heading-1', text: 'Heading 1', level: 1 }]
+      }))
+    };
+    window.DOMPurify = {
+      sanitize: jest.fn((html) => html)
+    };
+
+    eval(contentJsCode);
+
+    const btnMode = document.getElementById('mdviewer-btn-mode');
+    const btnModeText = document.getElementById('mdviewer-btn-mode-text');
+    const renderedContent = document.getElementById('mdviewer-rendered-content');
+    const rawView = document.getElementById('mdviewer-raw-view');
+    const btnToc = document.getElementById('mdviewer-btn-toc');
+    const tocSidebar = document.getElementById('mdviewer-toc-sidebar');
+    const tocNav = document.getElementById('mdviewer-toc-nav');
+
+    expect(tocNav.innerHTML).toContain('Heading 1');
+
+    // Toggle source mode
+    btnMode.click();
+    expect(renderedContent.style.display).toBe('none');
+    expect(rawView.style.display).toBe('block');
+    expect(btnModeText.textContent).toBe('Visualizar');
+
+    btnMode.click();
+    expect(renderedContent.style.display).toBe('block');
+    expect(rawView.style.display).toBe('none');
+    expect(btnModeText.textContent).toBe('Fonte');
+
+    // Toggle TOC
+    expect(tocSidebar.classList.contains('visible')).toBe(false);
+    btnToc.click();
+    expect(tocSidebar.classList.contains('visible')).toBe(true);
+  });
 });
