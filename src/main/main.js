@@ -43,6 +43,21 @@ function isPathAllowed(p) {
   }
 }
 
+// Sensitive system directories pre-computed to avoid repeated path.resolve calls in a loop
+const posixSysDirsPrecomputed = [
+  '/etc', '/bin', '/sbin', '/usr', '/var', '/dev',
+  '/proc', '/sys', '/boot', '/lib', '/lib64', '/root'
+].map(sysDir => {
+  const sysDirResolved = path.resolve(sysDir).toLowerCase();
+  return { resolved: sysDirResolved, prefix: sysDirResolved + path.sep };
+});
+
+const winSysDirsPrecomputed = [
+  'c:\\windows',
+  'c:\\program files',
+  'c:\\program files (x86)'
+].map(sysDir => ({ resolved: sysDir.toLowerCase(), prefix: sysDir.toLowerCase() + '\\' }));
+
 function isSystemOrRootDirectory(p) {
   if (!p || typeof p !== 'string') return true;
   try {
@@ -57,26 +72,16 @@ function isSystemOrRootDirectory(p) {
     const norm = resolved.toLowerCase();
 
     // Sensitive POSIX system directories
-    const posixSysDirs = [
-      '/etc', '/bin', '/sbin', '/usr', '/var', '/dev',
-      '/proc', '/sys', '/boot', '/lib', '/lib64', '/root'
-    ];
-    for (const sysDir of posixSysDirs) {
-      const sysDirResolved = path.resolve(sysDir).toLowerCase();
-      if (norm === sysDirResolved || norm.startsWith(sysDirResolved + path.sep)) {
+    for (const sysDir of posixSysDirsPrecomputed) {
+      if (norm === sysDir.resolved || norm.startsWith(sysDir.prefix)) {
         return true;
       }
     }
 
     // Sensitive Windows system directories
     if (process.platform === 'win32') {
-      const winSysDirs = [
-        'c:\\windows',
-        'c:\\program files',
-        'c:\\program files (x86)'
-      ];
-      for (const sysDir of winSysDirs) {
-        if (norm === sysDir || norm.startsWith(sysDir + '\\')) {
+      for (const sysDir of winSysDirsPrecomputed) {
+        if (norm === sysDir.resolved || norm.startsWith(sysDir.prefix)) {
           return true;
         }
       }
