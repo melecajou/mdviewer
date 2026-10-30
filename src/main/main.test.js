@@ -46,7 +46,7 @@ jest.mock('./file-watcher', () => {
 const fs = require('fs');
 const path = require('path');
 const { BrowserWindow, ipcMain, shell, nativeImage } = require('electron');
-const { normalizeCliArg, parseCommandLineArgs, addAllowedPath, allowedPaths, isIgnoredArg, isIgnoredDir, isPathAllowed, isSystemOrRootDirectory, loadIconConfig, getIconConfigSync, _clearAllowedPaths, _resetCachedIconConfig } = require('./main');
+const { normalizeCliArg, parseCommandLineArgs, resolveCliTarget, addAllowedPath, allowedPaths, isIgnoredArg, isIgnoredDir, isPathAllowed, isSystemOrRootDirectory, loadIconConfig, getIconConfigSync, _clearAllowedPaths, _resetCachedIconConfig } = require('./main');
 
 const ipcMainHandlers = new Map(ipcMain.handle.mock.calls);
 const openExternalHandler = ipcMainHandlers.get('shell:open-external');
@@ -58,6 +58,127 @@ describe('BrowserWindow webPreferences sandbox configuration', () => {
     // Read main.js source code or check window configuration
     const mainJsContent = fs.readFileSync(path.join(__dirname, 'main.js'), 'utf-8');
     expect(mainJsContent).toMatch(/sandbox:\s*true/);
+  });
+});
+
+describe('resolveCliTarget', () => {
+  const mockCwd = path.resolve('/mock/cwd');
+  const mockAppPath = path.resolve('/mock/app');
+  const mockMainScriptPath = path.resolve('/mock/app/src/main/main.js');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(fs, 'existsSync').mockImplementation(() => false);
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  it('should return null for null, undefined, empty string or non-string inputs', () => {
+    expect(resolveCliTarget(null, mockCwd, mockAppPath, mockMainScriptPath)).toBeNull();
+    expect(resolveCliTarget(undefined, mockCwd, mockAppPath, mockMainScriptPath)).toBeNull();
+    expect(resolveCliTarget('', mockCwd, mockAppPath, mockMainScriptPath)).toBeNull();
+    expect(resolveCliTarget(123, mockCwd, mockAppPath, mockMainScriptPath)).toBeNull();
+    expect(resolveCliTarget({}, mockCwd, mockAppPath, mockMainScriptPath)).toBeNull();
+  });
+
+  it('should return null for ignored arguments like flags or electron/mdviewer binaries', () => {
+    expect(resolveCliTarget('-v', mockCwd, mockAppPath, mockMainScriptPath)).toBeNull();
+    expect(resolveCliTarget('--version', mockCwd, mockAppPath, mockMainScriptPath)).toBeNull();
+    expect(resolveCliTarget('/usr/bin/electron', mockCwd, mockAppPath, mockMainScriptPath)).toBeNull();
+    expect(resolveCliTarget('electron', mockCwd, mockAppPath, mockMainScriptPath)).toBeNull();
+    expect(resolveCliTarget('mdviewer', mockCwd, mockAppPath, mockMainScriptPath)).toBeNull();
+  });
+
+  it('should return null if resolved path matches appPath or mainScriptPath', () => {
+    fs.existsSync.mockReturnValue(true);
+    expect(resolveCliTarget(mockAppPath, mockCwd, mockAppPath, mockMainScriptPath)).toBeNull();
+    expect(resolveCliTarget(mockMainScriptPath, mockCwd, mockAppPath, mockMainScriptPath)).toBeNull();
+  });
+
+  it('should resolve absolute paths correctly and return resolved path if file exists', () => {
+    const targetFile = path.resolve('/some/existing/doc.md');
+    fs.existsSync.mockImplementation((p) => p === targetFile);
+
+    expect(resolveCliTarget(targetFile, mockCwd, mockAppPath, mockMainScriptPath)).toBe(targetFile);
+  });
+
+  it('should resolve relative paths against cwd and return resolved path if file exists', () => {
+    const relativeArg = 'docs/readme.md';
+    const expectedPath = path.resolve(mockCwd, relativeArg);
+    fs.existsSync.mockImplementation((p) => p === expectedPath);
+
+    expect(resolveCliTarget(relativeArg, mockCwd, mockAppPath, mockMainScriptPath)).toBe(expectedPath);
+  });
+
+  it('should return null if resolved path does not exist', () => {
+    fs.existsSync.mockReturnValue(false);
+    expect(resolveCliTarget('nonexistent.md', mockCwd, mockAppPath, mockMainScriptPath)).toBeNull();
+  });
+
+  it('should handle file:// URIs via normalizeCliArg', () => {
+    const fileUri = 'file:///some/path/notes%201.md';
+    const expectedPath = path.resolve('/some/path/notes 1.md');
+    fs.existsSync.mockImplementation((p) => p === expectedPath);
+
+    expect(resolveCliTarget(fileUri, mockCwd, mockAppPath, mockMainScriptPath)).toBe(expectedPath);
+  });
+
+  describe('existsCache behavior', () => {
+    it('should check existsCache first and return cached existence without calling fs.existsSync', () => {
+      const cache = new Map();
+      const targetFile = path.resolve('/some/cached/file.md');
+
+      // Prime cache with true
+      cache.set(targetFile, true);
+
+      const result = resolveCliTarget(targetFile, mockCwd, mockAppPath, mockMainScriptPath, cache);
+
+      expect(result).toBe(targetFile);
+      expect(fs.existsSync).not.toHaveBeenCalled();
+    });
+
+    it('should return null without calling fs.existsSync if existsCache has false for target', () => {
+      const cache = new Map();
+      const targetFile = path.resolve('/some/cached/nonexistent.md');
+
+      // Prime cache with false
+      cache.set(targetFile, false);
+
+      const result = resolveCliTarget(targetFile, mockCwd, mockAppPath, mockMainScriptPath, cache);
+
+      expect(result).toBeNull();
+      expect(fs.existsSync).not.toHaveBeenCalled();
+    });
+
+    it('should call fs.existsSync on cache miss and store result in existsCache', () => {
+      const cache = new Map();
+      const existingFile = path.resolve('/mock/cwd/exist.md');
+      const nonExistingFile = path.resolve('/mock/cwd/missing.md');
+
+      fs.existsSync.mockImplementation((p) => p === existingFile);
+
+      // Miss 1: Existing file
+      const res1 = resolveCliTarget('exist.md', mockCwd, mockAppPath, mockMainScriptPath, cache);
+      expect(res1).toBe(existingFile);
+      expect(cache.get(existingFile)).toBe(true);
+
+      // Miss 2: Non-existing file
+      const res2 = resolveCliTarget('missing.md', mockCwd, mockAppPath, mockMainScriptPath, cache);
+      expect(res2).toBeNull();
+      expect(cache.get(nonExistingFile)).toBe(false);
+
+      expect(fs.existsSync).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('should catch errors gracefully and log to console.error', () => {
+    fs.existsSync.mockImplementation(() => {
+      throw new Error('EACCES: permission denied');
+    });
+
+    const result = resolveCliTarget('restricted.md', mockCwd, mockAppPath, mockMainScriptPath);
+
+    expect(result).toBeNull();
+    expect(console.error).toHaveBeenCalledWith('Error checking arg path:', expect.any(Error));
   });
 });
 
