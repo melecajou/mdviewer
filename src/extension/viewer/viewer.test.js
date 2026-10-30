@@ -699,6 +699,84 @@ describe('MDViewerExtensionApp', () => {
     });
   });
 
+  describe('checkActiveTabUpdates', () => {
+    it('should do nothing when there is no active tab', async () => {
+      const renderSpy = jest.spyOn(app, 'renderMarkdown');
+      await app.checkActiveTabUpdates();
+      expect(renderSpy).not.toHaveBeenCalled();
+    });
+
+    it('should do nothing when active tab has no fileHandle', async () => {
+      app.openDocumentTab('Doc1.md', '# Content', 'Doc1.md');
+      const renderSpy = jest.spyOn(app, 'renderMarkdown');
+      await app.checkActiveTabUpdates();
+      expect(renderSpy).not.toHaveBeenCalled();
+    });
+
+    it('should do nothing when file content on disk is unchanged', async () => {
+      const mockFile = { text: jest.fn().mockResolvedValue('# Content') };
+      const mockHandle = { getFile: jest.fn().mockResolvedValue(mockFile) };
+
+      app.openDocumentTab('Doc1.md', '# Content', 'Doc1.md', mockHandle);
+      const renderSpy = jest.spyOn(app, 'renderMarkdown');
+
+      await app.checkActiveTabUpdates();
+
+      expect(mockHandle.getFile).toHaveBeenCalled();
+      expect(renderSpy).not.toHaveBeenCalled();
+      expect(app.getActiveTab().content).toBe('# Content');
+    });
+
+    it('should do nothing when fresh content is empty or falsy', async () => {
+      const mockFile = { text: jest.fn().mockResolvedValue('') };
+      const mockHandle = { getFile: jest.fn().mockResolvedValue(mockFile) };
+
+      app.openDocumentTab('Doc1.md', '# Content', 'Doc1.md', mockHandle);
+      const renderSpy = jest.spyOn(app, 'renderMarkdown');
+
+      await app.checkActiveTabUpdates();
+
+      expect(mockHandle.getFile).toHaveBeenCalled();
+      expect(renderSpy).not.toHaveBeenCalled();
+      expect(app.getActiveTab().content).toBe('# Content');
+    });
+
+    it('should update tab content, textarea value and render markdown when fresh content differs', async () => {
+      const freshContent = '# Updated Content from Disk';
+      const mockFile = { text: jest.fn().mockResolvedValue(freshContent) };
+      const mockHandle = { getFile: jest.fn().mockResolvedValue(mockFile) };
+
+      app.openDocumentTab('Doc1.md', '# Original Content', 'Doc1.md', mockHandle);
+      const renderSpy = jest.spyOn(app, 'renderMarkdown');
+
+      await app.checkActiveTabUpdates();
+
+      expect(mockHandle.getFile).toHaveBeenCalled();
+      expect(app.getActiveTab().content).toBe(freshContent);
+      expect(app.sourceTextarea.value).toBe(freshContent);
+      expect(renderSpy).toHaveBeenCalledWith(freshContent);
+    });
+
+    it('should handle errors gracefully without throwing when reading file handle fails', async () => {
+      const mockHandle = { getFile: jest.fn().mockRejectedValue(new Error('Permission denied')) };
+
+      app.openDocumentTab('Doc1.md', '# Content', 'Doc1.md', mockHandle);
+      const renderSpy = jest.spyOn(app, 'renderMarkdown');
+
+      await expect(app.checkActiveTabUpdates()).resolves.not.toThrow();
+      expect(renderSpy).not.toHaveBeenCalled();
+    });
+
+    it('should trigger checkActiveTabUpdates when window focus event fires', async () => {
+      const checkSpy = jest.spyOn(app, 'checkActiveTabUpdates').mockResolvedValue();
+
+      window.dispatchEvent(new Event('focus'));
+
+      expect(checkSpy).toHaveBeenCalled();
+      checkSpy.mockRestore();
+    });
+  });
+
   describe('Editor & File Handlers', () => {
     it('should handle new file creation', () => {
       app.handleNewFile();
