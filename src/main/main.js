@@ -89,6 +89,28 @@ function isSystemOrRootDirectory(p) {
 }
 
 
+async function mapConcurrent(items, limit, fn) {
+  if (!items || items.length === 0) return [];
+  const results = new Array(items.length);
+  let index = 0;
+
+  const worker = async () => {
+    while (index < items.length) {
+      const i = index++;
+      results[i] = await fn(items[i], i);
+    }
+  };
+
+  const workers = [];
+  const count = Math.min(limit, items.length);
+  for (let i = 0; i < count; i++) {
+    workers.push(worker());
+  }
+
+  await Promise.all(workers);
+  return results;
+}
+
 function isIgnoredDir(entryName) {
   if (!entryName || typeof entryName !== 'string') return true;
   return (
@@ -562,17 +584,17 @@ ipcMain.handle('file:read-dir', async (event, dirPath) => {
     store.set('lastOpenedFolder', resolvedDir);
     await store.setLastDirectory(resolvedDir);
 
-    async function scanDirectory(dir, depth = 0) {
+    async function scanDirectory(dir, depth = 0, limit = 8) {
       if (depth > 5) return []; // Limit recursion depth
       const entries = await fs.promises.readdir(dir, { withFileTypes: true });
 
-      const promises = entries.map(async (entry) => {
+      const rawItems = await mapConcurrent(entries, limit, async (entry) => {
         if (isIgnoredDir(entry.name)) {
           return null;
         }
         const fullPath = path.join(dir, entry.name);
         if (entry.isDirectory()) {
-          const children = await scanDirectory(fullPath, depth + 1);
+          const children = await scanDirectory(fullPath, depth + 1, limit);
           return {
             name: entry.name,
             path: fullPath,
@@ -592,7 +614,7 @@ ipcMain.handle('file:read-dir', async (event, dirPath) => {
         }
       });
 
-      const items = (await Promise.all(promises)).filter(Boolean);
+      const items = rawItems.filter(Boolean);
 
       // Sort: folders first, then markdown files, then others
       return items.sort((a, b) => {
@@ -831,6 +853,7 @@ if (process.env.NODE_ENV === 'test') {
     isPathAllowed,
     isSystemOrRootDirectory,
     normalizeCliArg,
+    mapConcurrent,
     parseCommandLineArgs,
     loadIconConfig,
     getIconConfigSync,
