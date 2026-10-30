@@ -291,11 +291,9 @@ function getIconConfigSync() {
   const isWin = process.platform === 'win32';
   const icoPath = path.join(__dirname, '../assets/icon.ico');
   const pngPath = path.join(__dirname, '../assets/icon.png');
-  const iconImg = fs.existsSync(pngPath) ? nativeImage.createFromPath(pngPath) : undefined;
-  const iconPath = (isWin && fs.existsSync(icoPath)) ? icoPath : (iconImg || pngPath);
+  const iconPath = isWin ? icoPath : pngPath;
 
-  cachedIconConfig = { iconImg, iconPath };
-  return cachedIconConfig;
+  return { iconImg: undefined, iconPath };
 }
 
 function createWindow() {

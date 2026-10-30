@@ -681,20 +681,24 @@ describe('loadIconConfig & getIconConfigSync', () => {
     expect(fs.promises.access).not.toHaveBeenCalled();
   });
 
-  it('getIconConfigSync should return cached config if available, or sync fallback if not cached', () => {
-    // When cached
-    const mockCached = { iconImg: 'cachedImg', iconPath: '/cached/path' };
-    jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+  it('getIconConfigSync should return cached config if available, or non-blocking fallback if not cached', async () => {
+    jest.spyOn(fs, 'existsSync');
 
     _resetCachedIconConfig();
     const uncachedConfig = getIconConfigSync();
-    expect(fs.existsSync).toHaveBeenCalled();
+    expect(fs.existsSync).not.toHaveBeenCalled();
     expect(uncachedConfig).toBeDefined();
 
-    // Now cached
-    fs.existsSync.mockClear();
+    // After loadIconConfig populates cachedIconConfig
+    jest.spyOn(fs.promises, 'access').mockImplementation(async (p) => {
+      if (p.endsWith('icon.png')) return undefined;
+      throw new Error('ENOENT');
+    });
+    nativeImage.createFromPath.mockReturnValue('mockIconImg');
+
+    const loadedConfig = await loadIconConfig();
     const cachedConfig = getIconConfigSync();
-    expect(cachedConfig).toBe(uncachedConfig);
+    expect(cachedConfig).toBe(loadedConfig);
     expect(fs.existsSync).not.toHaveBeenCalled();
   });
 });
