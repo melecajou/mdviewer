@@ -354,9 +354,29 @@ describe('processMath', () => {
     });
 
     const markdown = '$$\\invalid{formula}$$';
-    const { markdown: processed } = processMath(markdown);
+    const { markdown: processed, restoreMath } = processMath(markdown);
 
     expect(processed).toBe(markdown);
+
+    const restored = restoreMath('<p>$$\\invalid{formula}$$</p>');
+    expect(restored).toBe('<p>$$\\invalid{formula}$$</p>');
+
+    katexSpy.mockRestore();
+  });
+
+  test('should handle katex rendering errors gracefully when parsing markdown with block math', () => {
+    const katexSpy = jest.spyOn(katex, 'renderToString').mockImplementation((formula) => {
+      if (formula.includes('\\bad\\formula')) {
+        throw new Error('KaTeX block rendering error');
+      }
+      return 'rendered-math';
+    });
+
+    const markdown = 'Block math $$\n\\bad\\formula\n$$ and text';
+    const result = parseMarkdown(markdown);
+
+    expect(result.html).toContain('$$\n\\bad\\formula\n$$');
+    expect(result.html).not.toContain('%%MATH_BLOCK_');
 
     katexSpy.mockRestore();
   });
