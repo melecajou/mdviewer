@@ -381,98 +381,65 @@ class MDViewerExtensionApp extends MDViewerBase {
     });
   }
 
-  handleGlobalKeyboardEvent(e) {
-    const isCmdOrCtrl = e.ctrlKey || e.metaKey;
-    const isEditorFocused = document.activeElement === this.sourceTextarea;
-    const keyLower = e.key.toLowerCase();
+  getShortcutCombo(e) {
+    const parts = [];
+    if (e.ctrlKey || e.metaKey) parts.push('mod');
+    if (e.altKey) parts.push('alt');
+    if (e.shiftKey) parts.push('shift');
+    parts.push(e.key.toLowerCase());
+    return parts.join('+');
+  }
 
-    const shortcuts = [
-      {
-        match: () => isCmdOrCtrl && keyLower === 'n' && !e.shiftKey,
-        action: () => { e.preventDefault(); this.handleNewFile(); }
-      },
-      {
-        match: () => isCmdOrCtrl && keyLower === 's' && !e.shiftKey,
-        action: () => { e.preventDefault(); this.handleSaveFile(); }
-      },
-      {
-        match: () => isCmdOrCtrl && keyLower === 'o' && !e.shiftKey,
-        action: () => { e.preventDefault(); this.handleOpenFile(); }
-      },
-      {
-        match: () => isCmdOrCtrl && keyLower === 'w',
-        action: () => {
+  getShortcutRegistry() {
+    if (!this.shortcutRegistry) {
+      this.shortcutRegistry = new Map([
+        ['mod+n', (e) => { e.preventDefault(); this.handleNewFile(); }],
+        ['mod+s', (e) => { e.preventDefault(); this.handleSaveFile(); }],
+        ['mod+o', (e) => { e.preventDefault(); this.handleOpenFile(); }],
+        ['mod+w', (e) => {
           e.preventDefault();
           if (this.activeTabId) this.closeTab(this.activeTabId);
-        }
-      },
-      {
-        match: () => isCmdOrCtrl && keyLower === 'r',
-        action: () => { e.preventDefault(); this.reloadActiveTab(); }
-      },
-      {
-        match: () => isCmdOrCtrl && keyLower === 'f',
-        action: () => { e.preventDefault(); this.openFindBar(); }
-      },
-      {
-        match: () => isCmdOrCtrl && keyLower === 'p',
-        action: () => { e.preventDefault(); this.exportToPdf(); }
-      },
-      {
-        match: () => isCmdOrCtrl && keyLower === 'b',
-        action: () => {
-          if (!isEditorFocused) {
+        }],
+        ['mod+r', (e) => { e.preventDefault(); this.reloadActiveTab(); }],
+        ['mod+f', (e) => { e.preventDefault(); this.openFindBar(); }],
+        ['mod+p', (e) => { e.preventDefault(); this.exportToPdf(); }],
+        ['mod+b', (e) => {
+          if (document.activeElement !== this.sourceTextarea) {
             e.preventDefault();
             this.toggleSidebar();
           }
-        }
-      },
-      {
-        match: () => isCmdOrCtrl && e.shiftKey && e.key === 'T',
-        action: () => {
+        }],
+        ['mod+shift+t', (e) => {
           e.preventDefault();
           this.switchSidebarTab('toc');
           if (this.isSidebarCollapsed) this.toggleSidebar(true);
-        }
-      },
-      {
-        match: () => e.altKey && e.key === '1',
-        action: () => { e.preventDefault(); this.setViewMode('preview'); }
-      },
-      {
-        match: () => e.altKey && e.key === '2',
-        action: () => { e.preventDefault(); this.setViewMode('split'); }
-      },
-      {
-        match: () => e.altKey && e.key === '3',
-        action: () => { e.preventDefault(); this.setViewMode('source'); }
-      },
-      {
-        match: () => isCmdOrCtrl && (e.key === '=' || e.key === '+'),
-        action: () => { e.preventDefault(); this.changeZoom(0.1); }
-      },
-      {
-        match: () => isCmdOrCtrl && e.key === '-',
-        action: () => { e.preventDefault(); this.changeZoom(-0.1); }
-      },
-      {
-        match: () => isCmdOrCtrl && e.key === '0',
-        action: () => { e.preventDefault(); this.resetZoom(); }
-      },
-      {
-        match: () => e.key === 'F1',
-        action: () => {
+        }],
+        ['alt+1', (e) => { e.preventDefault(); this.setViewMode('preview'); }],
+        ['alt+2', (e) => { e.preventDefault(); this.setViewMode('split'); }],
+        ['alt+3', (e) => { e.preventDefault(); this.setViewMode('source'); }],
+        ['mod+=', (e) => { e.preventDefault(); this.changeZoom(0.1); }],
+        ['mod++', (e) => { e.preventDefault(); this.changeZoom(0.1); }],
+        ['mod+shift+=', (e) => { e.preventDefault(); this.changeZoom(0.1); }],
+        ['mod+shift++', (e) => { e.preventDefault(); this.changeZoom(0.1); }],
+        ['mod+-', (e) => { e.preventDefault(); this.changeZoom(-0.1); }],
+        ['mod+_', (e) => { e.preventDefault(); this.changeZoom(-0.1); }],
+        ['mod+shift+-', (e) => { e.preventDefault(); this.changeZoom(-0.1); }],
+        ['mod+shift+_', (e) => { e.preventDefault(); this.changeZoom(-0.1); }],
+        ['mod+0', (e) => { e.preventDefault(); this.resetZoom(); }],
+        ['f1', (e) => {
           e.preventDefault();
           if (this.shortcutsModal) this.shortcutsModal.classList.add('visible');
-        }
-      }
-    ];
+        }]
+      ]);
+    }
+    return this.shortcutRegistry;
+  }
 
-    for (const shortcut of shortcuts) {
-      if (shortcut.match()) {
-        shortcut.action();
-        break;
-      }
+  handleGlobalKeyboardEvent(e) {
+    const combo = this.getShortcutCombo(e);
+    const handler = this.getShortcutRegistry().get(combo);
+    if (handler) {
+      handler(e);
     }
   }
 
