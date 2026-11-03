@@ -843,7 +843,19 @@ class MDViewerApp extends _MDViewerBase {
     this.markdownContainer.innerHTML = sanitizedHtml;
     this.headings = parsed.headings || [];
 
-    // Attach heading anchor copy link
+    this.setupHeadingAnchors();
+    this.updateStatusBarStats(parsed.stats);
+    this.setupPreviewImages(tab);
+    this.setupCopyCodeButtons();
+    this.setupLinkInterceptors(tab);
+    this.setupTaskCheckboxes();
+    this.renderMermaidDiagrams();
+
+    // Render TOC
+    this.renderToc(this.headings);
+  }
+
+  setupHeadingAnchors() {
     const headingAnchors = this.markdownContainer.querySelectorAll('.heading-anchor');
     headingAnchors.forEach(anchor => {
       anchor.addEventListener('click', () => {
@@ -851,19 +863,20 @@ class MDViewerApp extends _MDViewerBase {
         navigator.clipboard.writeText(window.location.origin + window.location.pathname + '#' + id);
       });
     });
+  }
 
-    // Update Status Bar
-    if (parsed.stats) {
-      this.statusStats.textContent = `${parsed.stats.words.toLocaleString()} palavras • ${parsed.stats.lines} linhas`;
-      this.statusReadTime.textContent = `${parsed.stats.readTimeMinutes} min de leitura`;
+  updateStatusBarStats(stats) {
+    if (stats) {
+      this.statusStats.textContent = `${stats.words.toLocaleString()} palavras • ${stats.lines} linhas`;
+      this.statusReadTime.textContent = `${stats.readTimeMinutes} min de leitura`;
     }
+  }
 
-    // Resolve relative images & add lightbox
+  setupPreviewImages(tab) {
     const images = this.markdownContainer.querySelectorAll('img');
     images.forEach(img => {
       const src = img.getAttribute('src');
       if (src && !src.startsWith('http://') && !src.startsWith('https://') && !src.startsWith('data:') && !src.startsWith('file://')) {
-        // Resolve relative to markdown file directory
         img.src = `file://${tab.dirName}/${src}`;
       }
       img.addEventListener('click', () => {
@@ -871,8 +884,9 @@ class MDViewerApp extends _MDViewerBase {
         this.lightboxModal.classList.add('visible');
       });
     });
+  }
 
-    // Setup Copy Code buttons
+  setupCopyCodeButtons() {
     const copyButtons = this.markdownContainer.querySelectorAll('.copy-code-button');
     copyButtons.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -886,8 +900,9 @@ class MDViewerApp extends _MDViewerBase {
         });
       });
     });
+  }
 
-    // Intercept internal & external links
+  setupLinkInterceptors(tab) {
     const links = this.markdownContainer.querySelectorAll('a');
     links.forEach(a => {
       const href = a.getAttribute('href');
@@ -917,8 +932,9 @@ class MDViewerApp extends _MDViewerBase {
         });
       }
     });
+  }
 
-    // Setup interactive task checkboxes in preview
+  setupTaskCheckboxes() {
     const taskCheckboxes = this.markdownContainer.querySelectorAll('.task-list-item input[type="checkbox"]');
     taskCheckboxes.forEach((chk, index) => {
       chk.removeAttribute('disabled');
@@ -927,8 +943,9 @@ class MDViewerApp extends _MDViewerBase {
         this.toggleTaskCheckbox(index, chk.checked);
       });
     });
+  }
 
-    // Render Mermaid diagrams
+  renderMermaidDiagrams() {
     if (window.mermaid) {
       try {
         const mermaidEls = this.markdownContainer.querySelectorAll('.mermaid');
@@ -939,9 +956,6 @@ class MDViewerApp extends _MDViewerBase {
         console.error('Error rendering Mermaid diagram:', err);
       }
     }
-
-    // Render TOC
-    this.renderToc(this.headings);
   }
 
   // ---------------- Table of Contents (TOC) ----------------
