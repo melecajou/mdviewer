@@ -32,48 +32,35 @@
     return false;
   }
 
-  if (!isMarkdownDocument()) {
-    return;
-  }
-
-  window.__MDVIEWER_INITIALIZED__ = true;
-
   // Obter texto bruto original
-  let rawText = '';
-  const existingPre = document.querySelector('body > pre');
-  if (existingPre) {
-    rawText = existingPre.textContent;
-    existingPre.style.display = 'none';
-  } else {
-    rawText = document.body.innerText || '';
-    document.body.innerHTML = '';
+  function extractRawText() {
+    let rawText = '';
+    const existingPre = document.querySelector('body > pre');
+    if (existingPre) {
+      rawText = existingPre.textContent;
+      existingPre.style.display = 'none';
+    } else {
+      rawText = document.body.innerText || '';
+      document.body.innerHTML = '';
+    }
+    return rawText;
   }
 
-  const escapeHtml = (unsafe) => MDViewerBase.escapeHtml(unsafe);
-
-  // Nome do arquivo
-  const filename = decodeURIComponent(window.location.pathname.split('/').pop()) || 'documento.md';
-  const safeFilename = escapeHtml(filename);
-
-  // Carregar tema inicial das configurações da extensão
-  let currentTheme = 'github-dark';
-  chrome.storage.local.get(['theme'], (result) => {
-    if (result.theme) {
-      currentTheme = result.theme;
-      document.documentElement.setAttribute('data-theme', currentTheme);
-      const themeSelect = document.getElementById('mdviewer-toolbar-theme');
-      if (themeSelect) themeSelect.value = currentTheme;
-    }
-  });
-
-  document.documentElement.setAttribute('data-theme', currentTheme);
-  document.body.classList.add('mdviewer-injected-body');
+  // Nome do arquivo seguro
+  function getSafeFilename() {
+    const filename = decodeURIComponent(window.location.pathname.split('/').pop()) || 'documento.md';
+    const safeFilename = MDViewerBase.escapeHtml(filename);
+    return { filename, safeFilename };
+  }
 
   // Criar interface do MDViewer
-  const root = document.createElement('div');
-  root.className = 'mdviewer-content-root';
+  function createUIContainer(safeFilename) {
+    document.body.classList.add('mdviewer-injected-body');
 
-  root.innerHTML = `
+    const root = document.createElement('div');
+    root.className = 'mdviewer-content-root';
+
+    root.innerHTML = `
     <div class="mdviewer-floating-toolbar">
       <div class="mdviewer-toolbar-left">
         <span class="mdviewer-badge">
@@ -136,23 +123,68 @@
     </div>
   `;
 
-  document.body.appendChild(root);
+    document.body.appendChild(root);
 
-  const renderedContent = document.getElementById('mdviewer-rendered-content');
-  const rawView = document.getElementById('mdviewer-raw-view');
-  const tocSidebar = document.getElementById('mdviewer-toc-sidebar');
-  const tocNav = document.getElementById('mdviewer-toc-nav');
-  const btnToc = document.getElementById('mdviewer-btn-toc');
-  const btnMode = document.getElementById('mdviewer-btn-mode');
-  const btnModeText = document.getElementById('mdviewer-btn-mode-text');
-  const themeSelect = document.getElementById('mdviewer-toolbar-theme');
-  const btnPrint = document.getElementById('mdviewer-btn-print');
-  const btnWorkspace = document.getElementById('mdviewer-btn-workspace');
+    return {
+      renderedContent: document.getElementById('mdviewer-rendered-content'),
+      rawView: document.getElementById('mdviewer-raw-view'),
+      tocSidebar: document.getElementById('mdviewer-toc-sidebar'),
+      tocNav: document.getElementById('mdviewer-toc-nav'),
+      btnToc: document.getElementById('mdviewer-btn-toc'),
+      btnMode: document.getElementById('mdviewer-btn-mode'),
+      btnModeText: document.getElementById('mdviewer-btn-mode-text'),
+      themeSelect: document.getElementById('mdviewer-toolbar-theme'),
+      btnPrint: document.getElementById('mdviewer-btn-print'),
+      btnWorkspace: document.getElementById('mdviewer-btn-workspace')
+    };
+  }
 
-  let isSourceMode = false;
+  // Inicializar configurações e listener de tema
+  function initTheme(themeSelect) {
+    let currentTheme = 'github-dark';
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.get(['theme'], (result) => {
+        if (result && result.theme) {
+          currentTheme = result.theme;
+          document.documentElement.setAttribute('data-theme', currentTheme);
+          if (themeSelect) themeSelect.value = currentTheme;
+        }
+      });
+    }
+
+    document.documentElement.setAttribute('data-theme', currentTheme);
+
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+      chrome.storage.onChanged.addListener((changes) => {
+        if (changes.theme) {
+          document.documentElement.setAttribute('data-theme', changes.theme.newValue);
+          if (themeSelect) themeSelect.value = changes.theme.newValue;
+        }
+      });
+    }
+  }
+
+  // Gerar TOC
+  function renderToc(headings, tocNav) {
+    if (!headings || headings.length === 0) {
+      tocNav.innerHTML = `<span style="font-size:11px; color:var(--text-muted);">Nenhum título encontrado</span>`;
+      return;
+    }
+
+    tocNav.innerHTML = headings.map(h => {
+      const safeText = MDViewerBase.escapeHtml(h.text);
+      return `
+      <a href="#${h.id}" class="mdviewer-toc-link level-${Math.min(h.level, 4)}" title="${safeText}">
+        ${safeText}
+      </a>
+    `;
+    }).join('');
+  }
 
   // Renderizar o markdown
-  function render(text) {
+  function renderMarkdownContent(text, elements) {
+    const { renderedContent, rawView, tocNav } = elements;
+
     if (!window.MDViewerEngine || !window.MDViewerEngine.parseMarkdown) {
       renderedContent.innerHTML = `<p>Erro: Motor de renderização do MDViewer não foi carregado.</p>`;
       return;
@@ -200,7 +232,7 @@
     }
 
     // Gerar TOC
-    renderToc(headings);
+    renderToc(headings, tocNav);
 
     // Conectar botões de copiar código
     renderedContent.querySelectorAll('.copy-code-button').forEach(btn => {
@@ -212,85 +244,100 @@
     });
   }
 
-  function renderToc(headings) {
-    if (!headings || headings.length === 0) {
-      tocNav.innerHTML = `<span style="font-size:11px; color:var(--text-muted);">Nenhum título encontrado</span>`;
+  // Conectar eventos dos elementos da interface
+  function attachEventListeners(elements, state, docInfo) {
+    const {
+      btnToc,
+      btnMode,
+      btnModeText,
+      themeSelect,
+      btnPrint,
+      btnWorkspace,
+      tocSidebar,
+      renderedContent,
+      rawView
+    } = elements;
+
+    btnToc.addEventListener('click', () => {
+      tocSidebar.classList.toggle('visible');
+    });
+
+    btnMode.addEventListener('click', () => {
+      state.isSourceMode = !state.isSourceMode;
+      if (state.isSourceMode) {
+        renderedContent.style.display = 'none';
+        rawView.style.display = 'block';
+        btnModeText.textContent = 'Visualizar';
+      } else {
+        renderedContent.style.display = 'block';
+        rawView.style.display = 'none';
+        btnModeText.textContent = 'Fonte';
+      }
+    });
+
+    themeSelect.addEventListener('change', (e) => {
+      const theme = e.target.value;
+      document.documentElement.setAttribute('data-theme', theme);
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({ theme });
+      }
+    });
+
+    btnPrint.addEventListener('click', () => {
+      window.print();
+    });
+
+    btnWorkspace.addEventListener('click', () => {
+      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+        chrome.runtime.sendMessage({
+          action: 'openViewer',
+          url: window.location.href,
+          content: state.rawText,
+          filename: docInfo.filename
+        });
+      }
+    });
+
+    // Auto-reload em URLs file:/// ao recuperar o foco da janela
+    if (window.location.protocol === 'file:') {
+      window.addEventListener('focus', async () => {
+        try {
+          const response = await fetch(window.location.href, { cache: 'no-store' });
+          if (response.ok) {
+            const freshText = await response.text();
+            if (freshText && freshText !== state.rawText) {
+              state.rawText = freshText;
+              renderMarkdownContent(state.rawText, elements);
+            }
+          }
+        } catch {
+          // Ignora erros de permissão ou CORS
+        }
+      });
+    }
+  }
+
+  // Inicialização do content script
+  function initContentScript() {
+    if (!isMarkdownDocument()) {
       return;
     }
 
-    tocNav.innerHTML = headings.map(h => {
-      const safeText = escapeHtml(h.text);
-      return `
-      <a href="#${h.id}" class="mdviewer-toc-link level-${Math.min(h.level, 4)}" title="${safeText}">
-        ${safeText}
-      </a>
-    `;
-    }).join('');
+    window.__MDVIEWER_INITIALIZED__ = true;
+
+    const rawText = extractRawText();
+    const docInfo = getSafeFilename();
+    const elements = createUIContainer(docInfo.safeFilename);
+
+    const state = {
+      rawText,
+      isSourceMode: false
+    };
+
+    initTheme(elements.themeSelect);
+    attachEventListeners(elements, state, docInfo);
+    renderMarkdownContent(state.rawText, elements);
   }
 
-  // Eventos de controles
-  btnToc.addEventListener('click', () => {
-    tocSidebar.classList.toggle('visible');
-  });
-
-  btnMode.addEventListener('click', () => {
-    isSourceMode = !isSourceMode;
-    if (isSourceMode) {
-      renderedContent.style.display = 'none';
-      rawView.style.display = 'block';
-      btnModeText.textContent = 'Visualizar';
-    } else {
-      renderedContent.style.display = 'block';
-      rawView.style.display = 'none';
-      btnModeText.textContent = 'Fonte';
-    }
-  });
-
-  themeSelect.addEventListener('change', (e) => {
-    const theme = e.target.value;
-    document.documentElement.setAttribute('data-theme', theme);
-    chrome.storage.local.set({ theme });
-  });
-
-  btnPrint.addEventListener('click', () => {
-    window.print();
-  });
-
-  btnWorkspace.addEventListener('click', () => {
-    chrome.runtime.sendMessage({
-      action: 'openViewer',
-      url: window.location.href,
-      content: rawText,
-      filename
-    });
-  });
-
-  // Atualização em tempo real caso o usuário altere as configurações em outra aba
-  chrome.storage.onChanged.addListener((changes) => {
-    if (changes.theme) {
-      document.documentElement.setAttribute('data-theme', changes.theme.newValue);
-      if (themeSelect) themeSelect.value = changes.theme.newValue;
-    }
-  });
-
-  // Auto-reload em URLs file:/// ao recuperar o foco da janela
-  if (window.location.protocol === 'file:') {
-    window.addEventListener('focus', async () => {
-      try {
-        const response = await fetch(window.location.href, { cache: 'no-store' });
-        if (response.ok) {
-          const freshText = await response.text();
-          if (freshText && freshText !== rawText) {
-            rawText = freshText;
-            render(rawText);
-          }
-        }
-      } catch {
-        // Ignora erros de permissão ou CORS
-      }
-    });
-  }
-
-  // Render inicial
-  render(rawText);
+  initContentScript();
 })();
