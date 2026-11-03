@@ -545,16 +545,30 @@ class MDViewerExtensionApp extends MDViewerBase {
     });
   }
 
-  async scanDirectoryHandle(handle, currentRelPath = '', depth = 0) {
+  async scanDirectoryHandle(handle, currentRelPath = '', depth = 0, batchSize = 32) {
     if (depth > 12) return [];
 
-    const promises = [];
+    const entries = [];
+    let currentBatch = [];
+
     for await (const entry of handle.values()) {
-      promises.push(this.processDirectoryEntry(entry, currentRelPath, depth));
+      currentBatch.push(this.processDirectoryEntry(entry, currentRelPath, depth));
+      if (currentBatch.length >= batchSize) {
+        const results = await Promise.all(currentBatch);
+        for (let i = 0; i < results.length; i++) {
+          if (results[i]) entries.push(results[i]);
+        }
+        currentBatch = [];
+      }
     }
 
-    const results = await Promise.all(promises);
-    const entries = results.filter(Boolean);
+    if (currentBatch.length > 0) {
+      const results = await Promise.all(currentBatch);
+      for (let i = 0; i < results.length; i++) {
+        if (results[i]) entries.push(results[i]);
+      }
+    }
+
     return this.sortDirectoryEntries(entries);
   }
 

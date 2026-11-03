@@ -983,6 +983,29 @@ describe('MDViewerExtensionApp', () => {
         const result = await app.scanDirectoryHandle(dummyHandle, 'a/b/c', 13);
         expect(result).toEqual([]);
       });
+
+      it('scanDirectoryHandle should process entries in batches of 32 and return sorted results', async () => {
+        const mockEntries = [];
+        for (let i = 50; i >= 1; i--) {
+          const numStr = String(i).padStart(2, '0');
+          mockEntries.push({ kind: 'file', name: `doc_${numStr}.md` });
+        }
+
+        const mockHandle = {
+          values: jest.fn().mockReturnValue(mockEntries[Symbol.iterator]())
+        };
+
+        const processSpy = jest.spyOn(app, 'processDirectoryEntry');
+
+        const tree = await app.scanDirectoryHandle(mockHandle, '', 0, 32);
+
+        expect(processSpy).toHaveBeenCalledTimes(50);
+        expect(tree.length).toBe(50);
+        expect(tree[0].name).toBe('doc_01.md');
+        expect(tree[49].name).toBe('doc_50.md');
+
+        processSpy.mockRestore();
+      });
     });
 
     it('should render file list in explorer correctly constructing folder tree', () => {
