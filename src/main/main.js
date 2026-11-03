@@ -835,6 +835,7 @@ if (process.env.NODE_ENV === 'test') {
     isSystemOrRootDirectory,
     normalizeCliArg,
     parseCommandLineArgs,
+    resolveCliTarget,
     loadIconConfig,
     getIconConfigSync,
     _clearAllowedPaths: () => {
