@@ -243,28 +243,28 @@ describe('parseCommandLineArgs', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    // Default existsSync to return false, explicitly mock true for files we want to "exist"
-    jest.spyOn(fs, 'existsSync').mockImplementation(() => false);
+    // Default fs.promises.access to reject (file not exists), explicitly mock resolve for existing files
+    jest.spyOn(fs.promises, 'access').mockRejectedValue(new Error('ENOENT'));
     jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  it('should return empty array if argv is not an array', () => {
-    expect(parseCommandLineArgs(null)).toEqual([]);
-    expect(parseCommandLineArgs(undefined)).toEqual([]);
-    expect(parseCommandLineArgs({})).toEqual([]);
-    expect(parseCommandLineArgs('string')).toEqual([]);
+  it('should return empty array if argv is not an array', async () => {
+    expect(await parseCommandLineArgs(null)).toEqual([]);
+    expect(await parseCommandLineArgs(undefined)).toEqual([]);
+    expect(await parseCommandLineArgs({})).toEqual([]);
+    expect(await parseCommandLineArgs('string')).toEqual([]);
   });
 
-  it('should ignore null, undefined, empty string, and non-string arguments', () => {
-    expect(parseCommandLineArgs([''])).toEqual([]);
-    expect(parseCommandLineArgs([null, undefined, 123, {}, []])).toEqual([]);
+  it('should ignore null, undefined, empty string, and non-string arguments', async () => {
+    expect(await parseCommandLineArgs([''])).toEqual([]);
+    expect(await parseCommandLineArgs([null, undefined, 123, {}, []])).toEqual([]);
   });
 
-  it('should ignore flags starting with -', () => {
-    expect(parseCommandLineArgs(['-r', '--version', '--ozone-platform=wayland', '-'])).toEqual([]);
+  it('should ignore flags starting with -', async () => {
+    expect(await parseCommandLineArgs(['-r', '--version', '--ozone-platform=wayland', '-'])).toEqual([]);
   });
 
-  it('should ignore electron and mdviewer binaries', () => {
+  it('should ignore electron and mdviewer binaries', async () => {
     const args = [
       '/usr/bin/electron',
       'C:\\Program Files\\MDViewer\\mdviewer.exe',
@@ -274,65 +274,80 @@ describe('parseCommandLineArgs', () => {
       'electron',
       'mdviewer'
     ];
-    expect(parseCommandLineArgs(args)).toEqual([]);
+    expect(await parseCommandLineArgs(args)).toEqual([]);
   });
 
-  it('should skip app path and main script path', () => {
+  it('should skip app path and main script path', async () => {
     const appPath = path.resolve(__dirname, '../..');
     const mainScriptPath = path.resolve(__dirname, 'main.js');
 
-    fs.existsSync.mockImplementation((p) => p === appPath || p === mainScriptPath);
+    jest.spyOn(fs.promises, 'access').mockImplementation(async (p) => {
+      if (p === appPath || p === mainScriptPath) return undefined;
+      throw new Error('ENOENT');
+    });
 
-    expect(parseCommandLineArgs([appPath, mainScriptPath])).toEqual([]);
+    expect(await parseCommandLineArgs([appPath, mainScriptPath])).toEqual([]);
   });
 
-  it('should resolve and return existing absolute paths', () => {
+  it('should resolve and return existing absolute paths', async () => {
     const absolutePath = path.resolve('/existing/file.md');
-    fs.existsSync.mockImplementation((p) => p === absolutePath);
+    jest.spyOn(fs.promises, 'access').mockImplementation(async (p) => {
+      if (p === absolutePath) return undefined;
+      throw new Error('ENOENT');
+    });
 
-    expect(parseCommandLineArgs([absolutePath])).toEqual([absolutePath]);
+    expect(await parseCommandLineArgs([absolutePath])).toEqual([absolutePath]);
   });
 
-  it('should add target file and its non-system parent directory to allowedPaths', () => {
+  it('should add target file and its non-system parent directory to allowedPaths', async () => {
     _clearAllowedPaths();
     const filePath = path.resolve('/home/user/notes/test.md');
-    fs.existsSync.mockImplementation((p) => p === filePath);
+    jest.spyOn(fs.promises, 'access').mockImplementation(async (p) => {
+      if (p === filePath) return undefined;
+      throw new Error('ENOENT');
+    });
 
-    const result = parseCommandLineArgs([filePath]);
+    const result = await parseCommandLineArgs([filePath]);
     expect(result).toEqual([filePath]);
     expect(isPathAllowed(filePath)).toBe(true);
     expect(isPathAllowed(path.dirname(filePath))).toBe(true);
   });
 
-  it('should resolve relative paths against cwd', () => {
+  it('should resolve relative paths against cwd', async () => {
     const cwd = '/mock/cwd';
     const relativeArg = 'docs/file.md';
     const expectedPath = path.resolve(cwd, relativeArg);
 
-    fs.existsSync.mockImplementation((p) => p === expectedPath);
+    jest.spyOn(fs.promises, 'access').mockImplementation(async (p) => {
+      if (p === expectedPath) return undefined;
+      throw new Error('ENOENT');
+    });
 
-    expect(parseCommandLineArgs([relativeArg], cwd)).toEqual([expectedPath]);
+    expect(await parseCommandLineArgs([relativeArg], cwd)).toEqual([expectedPath]);
   });
 
-  it('should skip paths that do not exist', () => {
-    fs.existsSync.mockImplementation(() => false);
+  it('should skip paths that do not exist', async () => {
+    jest.spyOn(fs.promises, 'access').mockRejectedValue(new Error('ENOENT'));
 
-    expect(parseCommandLineArgs(['non-existent.md'])).toEqual([]);
+    expect(await parseCommandLineArgs(['non-existent.md'])).toEqual([]);
   });
 
   describe('file:// URIs handling', () => {
-    it('should decode valid file:// URIs', () => {
+    it('should decode valid file:// URIs', async () => {
       const cwd = '/mock/cwd';
       // Use standard file:// URI
       const fileUri = 'file:///path/to/encoded%20file.md';
       const expectedPath = path.resolve('/path/to/encoded file.md');
 
-      fs.existsSync.mockImplementation((p) => p === expectedPath);
+      jest.spyOn(fs.promises, 'access').mockImplementation(async (p) => {
+        if (p === expectedPath) return undefined;
+        throw new Error('ENOENT');
+      });
 
-      expect(parseCommandLineArgs([fileUri], cwd)).toEqual([expectedPath]);
+      expect(await parseCommandLineArgs([fileUri], cwd)).toEqual([expectedPath]);
     });
 
-    it('should handle Windows specific file:// URIs correctly', () => {
+    it('should handle Windows specific file:// URIs correctly', async () => {
       // Mock platform as win32
       Object.defineProperty(process, 'platform', {
         value: 'win32'
@@ -348,12 +363,15 @@ describe('parseCommandLineArgs', () => {
         ? path.resolve(argAfterReplace)
         : path.resolve(cwd, argAfterReplace);
 
-      fs.existsSync.mockImplementation((p) => p === expectedPath);
+      jest.spyOn(fs.promises, 'access').mockImplementation(async (p) => {
+        if (p === expectedPath) return undefined;
+        throw new Error('ENOENT');
+      });
 
-      expect(parseCommandLineArgs([fileUri], cwd)).toEqual([expectedPath]);
+      expect(await parseCommandLineArgs([fileUri], cwd)).toEqual([expectedPath]);
     });
 
-    it('should gracefully handle malformed file:// URIs using regex fallback', () => {
+    it('should gracefully handle malformed file:// URIs using regex fallback', async () => {
       // Create a malformed URL that fails `new URL(arg)`
       const originalURL = global.URL;
       global.URL = jest.fn(() => { throw new Error('Invalid URL'); });
@@ -362,23 +380,28 @@ describe('parseCommandLineArgs', () => {
       const fileUri = 'file:///path/to/file.md';
       const expectedPath = path.resolve('/path/to/file.md');
 
-      fs.existsSync.mockImplementation((p) => p === expectedPath);
+      jest.spyOn(fs.promises, 'access').mockImplementation(async (p) => {
+        if (p === expectedPath) return undefined;
+        throw new Error('ENOENT');
+      });
 
-      expect(parseCommandLineArgs([fileUri], cwd)).toEqual([expectedPath]);
-
-      global.URL = originalURL;
+      try {
+        expect(await parseCommandLineArgs([fileUri], cwd)).toEqual([expectedPath]);
+      } finally {
+        global.URL = originalURL;
+      }
     });
   });
 
-  it('should catch exceptions during checking and log them', () => {
-    fs.existsSync.mockImplementation(() => {
+  it('should catch exceptions during checking and log them', async () => {
+    jest.spyOn(path, 'isAbsolute').mockImplementation(() => {
       throw new Error('Access denied');
     });
 
     const cwd = '/mock/cwd';
     const args = ['some-file.md'];
 
-    const result = parseCommandLineArgs(args, cwd);
+    const result = await parseCommandLineArgs(args, cwd);
 
     expect(result).toEqual([]);
     expect(console.error).toHaveBeenCalledWith('Error checking arg path:', expect.any(Error));
